@@ -1,6 +1,6 @@
 # MDiHub LMS — Learning Management System
 
-A modern, role-based Learning Management System built with Next.js 16 and React 19. Features student, facilitator, and admin dashboards with course management, assignments, quizzes, progress tracking, discussions, reviews, certificates, analytics, and more — all powered by client-side mock data with localStorage persistence.
+A modern, role-based Learning Management System built with Next.js 16 and React 19. Features student, facilitator, and admin dashboards with course management, assignments, quizzes, progress tracking, discussions, reviews, certificates, analytics, and more — powered by Prisma + SQLite with a full REST API layer.
 
 ## Tech Stack
 
@@ -12,12 +12,17 @@ A modern, role-based Learning Management System built with Next.js 16 and React 
 - **Notifications** — sonner
 - **Charts** — Recharts
 - **Calendar** — react-day-picker
-- **Data** — Client-side mock arrays with localStorage persistence (no backend required)
+- **Database** — SQLite via Prisma 7 + `@prisma/adapter-libsql`
+- **Auth** — JWT (jsonwebtoken) + bcryptjs
+- **AI Chat** — OpenAI-compatible API (optional, falls back to rule-based)
+- **Testing** — Vitest (unit), Playwright (E2E)
 
 ## Getting Started
 
 ```bash
 npm install
+npx prisma migrate dev    # Create SQLite database
+npx tsx prisma/seed.ts     # Seed with demo data
 npm run dev
 ```
 
@@ -27,6 +32,14 @@ Open [http://localhost:3000](http://localhost:3000) to see the app.
 
 ```bash
 npm run build
+npm run start
+```
+
+## Testing
+
+```bash
+npm test              # Unit tests (Vitest)
+npx playwright test   # E2E tests (Playwright)
 ```
 
 ## Roles
@@ -48,7 +61,7 @@ npm run build
 ## Features
 
 ### Core
-- Role-based authentication (sign-in / register / forgot password)
+- Role-based authentication (sign-in / register / forgot password) with JWT
 - Role-specific dashboards with contextual widgets
 - Course catalog with enrollment, status filters, and search
 - Module/lesson hierarchy within courses
@@ -105,17 +118,70 @@ npm run build
 - Priority badges (High / Medium / Low)
 
 ### Help & Support
-- **Built-in Chatbot** — floating rule-based assistant answering common questions about assignments, grades, courses, certificates, quizzes, etc. No external API required.
+- **AI-Powered Chatbot** — floating assistant with OpenAI-compatible API integration. Falls back to rule-based FAQ matching when no API key is configured. Configure via `AI_API_KEY`, `AI_API_URL`, and `AI_MODEL` environment variables.
 - Help page with FAQs
 
-### API Routes (Stubs)
-Basic REST API endpoints at `/api/auth`, `/api/courses`, `/api/announcements`, `/api/users` — ready for future backend integration.
+## API Routes
+
+Full REST API for all entities, all requiring Bearer token auth:
+
+| Endpoint | Methods |
+|----------|---------|
+| `/api/auth` | POST (signin, register, me) |
+| `/api/users` | GET, POST |
+| `/api/users/[id]` | GET, PATCH, DELETE |
+| `/api/courses` | GET, POST |
+| `/api/courses/[id]` | GET, PATCH, DELETE |
+| `/api/enrollments` | GET, POST |
+| `/api/modules` | GET (by courseId), POST |
+| `/api/modules/[id]` | GET, PATCH, DELETE |
+| `/api/lessons` | GET (optional moduleId), POST |
+| `/api/lessons/[id]` | GET, PATCH, DELETE |
+| `/api/activities` | GET (optional lessonId), POST |
+| `/api/activities/[id]` | GET, PATCH, DELETE |
+| `/api/assignments` | GET, POST |
+| `/api/assignments/[id]` | GET, PATCH, DELETE |
+| `/api/quizzes` | GET, POST |
+| `/api/quizzes/[id]` | GET, PATCH, DELETE |
+| `/api/submissions` | GET, POST |
+| `/api/submissions/[id]` | GET, PATCH, DELETE |
+| `/api/gradebook` | GET, POST |
+| `/api/gradebook/[id]` | GET, PATCH, DELETE |
+| `/api/announcements` | GET (optional targetAudience), POST |
+| `/api/notifications` | GET (optional userId), POST |
+| `/api/calendar-events` | GET, POST |
+| `/api/calendar-events/[id]` | GET, PATCH, DELETE |
+| `/api/discussions` | GET, POST |
+| `/api/discussions/[id]` | GET, PATCH, DELETE |
+| `/api/discussion-replies` | GET, POST |
+| `/api/discussion-replies/[id]` | GET, PATCH, DELETE |
+| `/api/course-reviews` | GET, POST |
+| `/api/course-reviews/[id]` | GET, PATCH, DELETE |
+| `/api/course-progress` | GET, POST |
+| `/api/course-progress/[id]` | GET, PATCH, DELETE |
+| `/api/certificates` | GET, POST |
+| `/api/certificates/[id]` | GET, PATCH, DELETE |
+| `/api/facilitator-applications` | GET, POST |
+| `/api/facilitator-applications/[id]` | GET, PATCH, DELETE |
+| `/api/chat` | POST (AI chat, accepts `{ messages }`) |
 
 ## Data Architecture
 
-All data lives in `src/lib/mock-data.ts` and is wrapped with a custom `makePersistent<T>()` helper that automatically persists mutations (push, splice, etc.) to `localStorage`. The app works fully offline — no backend connection is needed.
+All data is stored in a SQLite database via Prisma 7 with the `@prisma/adapter-libsql` driver adapter. The `DataProvider` context in `src/lib/data-context.tsx` fetches all entities from the API on mount, falling back to mock data if the API is unavailable.
 
-The `DataProvider` in `src/lib/data-context.tsx` provides a React context for all data types, though many pages access the mock arrays directly for simplicity.
+- **Schema:** `prisma/schema.prisma` (20 models)
+- **Seed:** `prisma/seed.ts` (7 users, 5 courses, 8 modules, etc.)
+- **Client:** `src/lib/prisma.ts` (singleton with libSQL adapter)
+- **Auth:** JWT tokens stored in sessionStorage (`lms_token`, `lms_user`)
+
+## Environment Variables
+
+```
+DATABASE_URL="file:./dev.db"
+AI_API_KEY=       # Optional — for AI chatbot
+AI_API_URL=       # Optional — defaults to https://api.openai.com/v1/chat/completions
+AI_MODEL=         # Optional — defaults to gpt-4o-mini
+```
 
 ## Project Structure
 
@@ -131,20 +197,26 @@ src/
 │   │   ├── announcements/
 │   │   └── users/       # Admin user management with bulk import
 │   ├── signin/          # Sign-in / register / forgot password
-│   ├── api/             # REST API stubs
+│   ├── api/             # Full REST API (26 route files across 20 entities)
 │   └── page.tsx         # Landing page
 ├── components/
 │   ├── ui/              # Radix UI primitives (button, card, dialog, etc.)
 │   ├── sidebar.tsx      # App sidebar navigation
 │   ├── top-nav.tsx      # Top navigation with search + notifications
 │   ├── auth-guard.tsx   # Route protection
-│   ├── chatbot.tsx      # Rule-based assistant
+│   ├── chatbot.tsx      # AI-powered assistant
 │   └── mdihub-logo.tsx  # SVG logo component
-└── lib/
-    ├── mock-data.ts     # All data types + mock arrays + persistence
-    ├── auth-context.tsx # Authentication context
-    ├── data-context.tsx # Data provider context
-    └── theme-context.tsx # Dark/light theme
+├── lib/
+│   ├── mock-data.ts     # All data types + mock arrays (fallback)
+│   ├── auth-context.tsx # Authentication context with API calls
+│   ├── data-context.tsx # Data provider context with API fetches
+│   ├── prisma.ts        # Prisma client singleton
+│   └── jwt.ts           # JWT sign/verify helpers
+├── generated/prisma/    # Prisma client output
+└── __tests__/           # Vitest unit tests
+prisma/
+├── schema.prisma        # Database schema (20 models)
+└── seed.ts              # Seed script
 ```
 
 ## License
