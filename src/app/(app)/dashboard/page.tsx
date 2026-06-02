@@ -1,15 +1,11 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { useAuth } from "../../../lib/auth-context"
-import {
-  mockCourses, mockAnnouncements, mockNotifications,
-  mockCalendarEvents, mockEnrollments, mockFacilitatorApplications,
-  mockModules, mockCourseProgress, mockSubmissions, mockAssignments,
-} from "../../../lib/mock-data"
+import { useData } from "../../../lib/data-context"
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card"
 import { Badge } from "../../../components/ui/badge"
 import { Button } from "../../../components/ui/button"
-import { Calendar } from "../../../components/ui/calendar"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import {
@@ -17,23 +13,30 @@ import {
   CalendarDays, CheckCircle, XCircle,
   ArrowRight, GraduationCap, Sparkles,
 } from "lucide-react"
+import { useLoading } from "../../../lib/use-loading"
+import { Skeleton, CardSkeleton, StatCardSkeleton } from "../../../components/skeleton"
+
+const Calendar = dynamic(() => import("../../../components/ui/calendar").then((m) => ({ default: m.Calendar })), { ssr: false })
 
 export default function Dashboard() {
+  const loading = useLoading(200)
   const { user, users, setUsers } = useAuth()
   const router = useRouter()
   const [date, setDate] = useState<Date | undefined>(new Date())
   const role = user?.role
+  const { courses, modules, enrollments, announcements: allAnnouncements, notifications, calendarEvents, facilitatorApplications, assignments, submissions, courseProgress } = useData()
 
   if (!user) return null
+  if (loading) return <DashboardSkeleton role={user.role} />
 
-  const myEnrollments = mockEnrollments.filter((e) => e.userId === user.id)
-  const myCourses = mockCourses.filter((c) => myEnrollments.some((e) => e.courseId === c.id))
-  const availableCourses = mockCourses.filter((c) => !myEnrollments.some((e) => e.courseId === c.id) && c.status === "Active")
-  const announcements = mockAnnouncements.filter((a) => a.targetAudience === "All" || (role && a.targetAudience === `${role}s`))
-  const unreadNotifications = mockNotifications.filter((n) => n.userId === user.id && !n.read)
-  const todayEvents = mockCalendarEvents.filter((e) => e.date >= new Date().toISOString().split("T")[0]).slice(0, 5)
+  const myEnrollments = enrollments.filter((e) => e.userId === user.id)
+  const myCourses = courses.filter((c) => myEnrollments.some((e) => e.courseId === c.id))
+  const availableCourses = courses.filter((c) => !myEnrollments.some((e) => e.courseId === c.id) && c.status === "Active")
+  const filteredAnnouncements = allAnnouncements.filter((a) => a.targetAudience === "All" || (role && a.targetAudience === `${role}s`))
+  const unreadNotifications = notifications.filter((n) => n.userId === user.id && !n.read)
+  const todayEvents = calendarEvents.filter((e) => e.date >= new Date().toISOString().split("T")[0]).slice(0, 5)
 
-  const pendingApplications = mockFacilitatorApplications.filter((a) => a.status === "Pending")
+  const pendingApplications = facilitatorApplications.filter((a) => a.status === "Pending")
   const pendingFacilitators = users.filter((u) => u.role === "Facilitator" && u.status === "Pending")
 
   const handleApprove = (userId: number) => {
@@ -46,7 +49,7 @@ export default function Dashboard() {
 
   const adminStats = [
     { label: "Total Users", value: users.length, sub: `${users.filter((u) => u.role === "Student").length} Students, ${users.filter((u) => u.role === "Facilitator").length} Facilitators`, icon: Users, color: "from-blue-600 to-blue-400" },
-    { label: "Total Courses", value: mockCourses.length, sub: `${mockCourses.filter((c) => c.status === "Active").length} Active`, icon: BookOpen, color: "from-emerald-600 to-emerald-400" },
+    { label: "Total Courses", value: courses.length, sub: `${courses.filter((c) => c.status === "Active").length} Active`, icon: BookOpen, color: "from-emerald-600 to-emerald-400" },
     { label: "Facilitator Applications", value: pendingApplications.length, sub: "Pending approval", icon: Sparkles, color: "from-amber-600 to-amber-400" },
     { label: "Pending Facilitators", value: pendingFacilitators.length, sub: "Awaiting activation", icon: Users, color: "from-rose-600 to-rose-400" },
   ]
@@ -54,8 +57,8 @@ export default function Dashboard() {
   return (
     <div className="p-6 lg:p-8 space-y-8 animate-fade-in">
       {user.status === "Pending" && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 animate-slide-up">
-          <p className="text-amber-800 text-sm font-medium">Your account is pending approval. Some features may be limited until an administrator activates your account.</p>
+        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/30 rounded-lg p-4 animate-slide-up">
+          <p className="text-amber-800 dark:text-amber-200 text-sm font-medium">Your account is pending approval. Some features may be limited until an administrator activates your account.</p>
         </div>
       )}
       <div className="animate-slide-up">
@@ -106,8 +109,8 @@ export default function Dashboard() {
               <h2 className="mb-4">My Courses</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {myCourses.map((course) => {
-                  const courseMods = mockModules.filter((m) => m.courseId === course.id)
-                  const progress = mockCourseProgress.find((p) => p.userId === user.id && p.courseId === course.id)
+                  const courseMods = modules.filter((m) => m.courseId === course.id)
+                  const progress = courseProgress.find((p) => p.userId === user.id && p.courseId === course.id)
                   const completedCount = progress?.completedModuleIds.length || 0
                   const totalCount = courseMods.length || 1
                   const pct = Math.round((completedCount / totalCount) * 100)
@@ -168,11 +171,11 @@ export default function Dashboard() {
             <h2 className="mb-4">My Facilitated Courses</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {(() => {
-                const myFacilitatedCourses = mockCourses.filter((c) => c.facilitatorId === user.id)
+                const myFacilitatedCourses = courses.filter((c) => c.facilitatorId === user.id)
                 return myFacilitatedCourses.length > 0 ? myFacilitatedCourses.map((course) => {
-                  const enrolled = mockEnrollments.filter((e) => e.courseId === course.id)
-                  const courseAssignments = mockAssignments.filter((a) => a.courseId === course.id)
-                  const pendingGrading = mockSubmissions.filter((s) => s.activityType === "assignment" && !s.graded && courseAssignments.some((a) => a.id === s.activityId))
+                  const enrolled = enrollments.filter((e) => e.courseId === course.id)
+                  const courseAssignments = assignments.filter((a) => a.courseId === course.id)
+                  const pendingGrading = submissions.filter((s) => s.activityType === "assignment" && !s.graded && courseAssignments.some((a) => a.id === s.activityId))
                   return (
                     <Card key={course.id} className="card-hover border-0 shadow-card cursor-pointer" onClick={() => router.push(`/courses/${course.id}`)}>
                       <div className="h-2 bg-gradient-gold rounded-t-lg" />
@@ -200,9 +203,9 @@ export default function Dashboard() {
             </div>
           </div>
           {(() => {
-            const myCourseIds = mockCourses.filter((c) => c.facilitatorId === user.id).map((c) => c.id)
-            const myAssignments = mockAssignments.filter((a) => myCourseIds.includes(a.courseId))
-            const pendingSubmissions = mockSubmissions.filter((s) => s.activityType === "assignment" && !s.graded && myAssignments.some((a) => a.id === s.activityId))
+            const myCourseIds = courses.filter((c) => c.facilitatorId === user.id).map((c) => c.id)
+            const myAssignments = assignments.filter((a) => myCourseIds.includes(a.courseId))
+            const pendingSubmissions = submissions.filter((s) => s.activityType === "assignment" && !s.graded && myAssignments.some((a) => a.id === s.activityId))
             if (pendingSubmissions.length === 0) return null
             return (
               <Card className="border-0 shadow-card animate-slide-up" style={{ animationDelay: "150ms" }}>
@@ -213,14 +216,14 @@ export default function Dashboard() {
                   <div className="space-y-3">
                     {pendingSubmissions.map((sub) => {
                       const student = users.find((u) => u.id === sub.userId)
-                      const assignment = mockAssignments.find((a) => a.id === sub.activityId)
+                      const assignment = assignments.find((a) => a.id === sub.activityId)
                       return (
                         <div key={sub.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
                           <div className="min-w-0 flex-1">
                             <p className="font-medium text-sm">{student ? `${student.firstName} ${student.lastName}` : `User #${sub.userId}`}</p>
                             <p className="text-xs text-muted-foreground">{assignment?.title || "Assignment"} &middot; Submitted {new Date(sub.submittedAt).toLocaleDateString()}</p>
                           </div>
-                          <Button size="sm" onClick={() => router.push(`/courses/${assignment?.courseId || ""}/modules/1/assignments/${sub.activityId}`)}>
+                          <Button size="sm" onClick={() => router.push(assignment?.courseId ? `/courses/${assignment.courseId}/modules/1/assignments/${sub.activityId}` : "#")}>
                             Grade
                           </Button>
                         </div>
@@ -241,7 +244,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {announcements.slice(0, 4).map((a) => (
+              {filteredAnnouncements.slice(0, 4).map((a) => (
                 <div key={a.id} className="p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
@@ -259,8 +262,8 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
-              {announcements.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No announcements</p>}
-              {announcements.length > 4 && (
+              {filteredAnnouncements.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No announcements</p>}
+              {filteredAnnouncements.length > 4 && (
                 <Button variant="ghost" size="sm" className="w-full text-gold hover:text-gold-dark hover:bg-gold/5" onClick={() => router.push("/announcements")}>
                   View All <ArrowRight className="w-3 h-3 ml-1" />
                 </Button>
@@ -350,6 +353,35 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+      )}
+    </div>
+  )
+}
+
+function DashboardSkeleton({ role }: { role: string }) {
+  return (
+    <div className="p-6 lg:p-8 space-y-8 animate-fade-in">
+      <div className="flex items-center gap-3">
+        <Skeleton className="w-10 h-10 rounded-xl" />
+        <div>
+          <Skeleton className="h-6 w-48 mb-1" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+      </div>
+      {role === "Admin" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          {Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)}
+        </div>
+      )}
+      {role === "Student" && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => <CardSkeleton key={i} />)}
+        </div>
+      )}
+      {role === "Facilitator" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 2 }).map((_, i) => <CardSkeleton key={i} />)}
+        </div>
       )}
     </div>
   )

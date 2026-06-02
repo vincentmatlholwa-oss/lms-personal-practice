@@ -6,8 +6,19 @@ import { mockUsers, mockFacilitatorApplications, type User, type Role } from "./
 interface AuthContextType {
   user: User | null
   users: User[]
-  signIn: (email: string, password: string) => User | null
-  register: (data: { firstName: string; lastName: string; email: string; password: string; role: Role; phone: string; idNumber: string; subject?: string; qualifications?: string; experience?: string }) => User
+  signIn: (email: string, password: string) => Promise<User | null>
+  register: (data: {
+    firstName: string
+    lastName: string
+    email: string
+    password: string
+    role: Role
+    phone: string
+    idNumber: string
+    subject?: string
+    qualifications?: string
+    experience?: string
+  }) => Promise<User>
   signOut: () => void
   updateUser: (updated: User) => void
   setUsers: (users: User[]) => void
@@ -34,6 +45,20 @@ function storeUser(user: User | null) {
   }
 }
 
+function getStoredToken(): string | null {
+  if (typeof window === "undefined") return null
+  return sessionStorage.getItem("lms_token")
+}
+
+function storeToken(token: string | null) {
+  if (typeof window === "undefined") return
+  if (token) {
+    sessionStorage.setItem("lms_token", token)
+  } else {
+    sessionStorage.removeItem("lms_token")
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>([...mockUsers])
   const [user, setUser] = useState<User | null>(() => getStoredUser())
@@ -43,47 +68,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (initialized) storeUser(user)
   }, [user, initialized])
 
-  const signIn = useCallback((email: string, password: string): User | null => {
-    const found = users.find((u) => u.email === email && u.password === password)
-    if (found) {
-      setUser(found)
-      return found
-    }
-    return null
-  }, [users])
-
-  const register = useCallback((data: { firstName: string; lastName: string; email: string; password: string; role: Role; phone: string; idNumber: string; subject?: string; qualifications?: string; experience?: string }): User => {
-    const status = data.role === "Facilitator" ? "Pending" : "Active"
-    const newUser: User = {
-      id: users.length + 1,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      email: data.email,
-      password: data.password,
-      role: data.role,
-      status,
-      phone: data.phone,
-      idNumber: data.idNumber,
-    }
-    setUsers((prev) => [...prev, newUser])
-    if (data.role === "Facilitator") {
-      mockFacilitatorApplications.push({
-        id: mockFacilitatorApplications.length + 1,
-        userId: newUser.id,
-        subject: data.subject || "",
-        qualifications: data.qualifications || "",
-        experience: data.experience || "",
-        date: new Date().toISOString().split("T")[0],
-        status: "Pending",
+  const signIn = useCallback(async (email: string, password: string): Promise<User | null> => {
+    try {
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "signin", email, password }),
       })
-    } else {
-      setUser(newUser)
+      if (!res.ok) return null
+      const data = await res.json()
+      setUser(data.user)
+      storeToken(data.token)
+      return data.user
+    } catch {
+      return null
     }
-    return newUser
-  }, [users.length])
+  }, [])
+
+  const register = useCallback(async (data: {
+    firstName: string
+    lastName: string
+    email: string
+    password: string
+    role: Role
+    phone: string
+    idNumber: string
+    subject?: string
+    qualifications?: string
+    experience?: string
+  }): Promise<User> => {
+    const res = await fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "register", ...data }),
+    })
+    const result = await res.json()
+    if (!res.ok) throw new Error(result.error || "Registration failed")
+
+    setUser(result.user)
+    storeToken(result.token)
+    return result.user
+  }, [])
 
   const signOut = useCallback(() => {
     setUser(null)
+    storeToken(null)
   }, [])
 
   const updateUser = useCallback((updated: User) => {

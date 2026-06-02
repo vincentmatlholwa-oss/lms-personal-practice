@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
-import { mockAssignments, mockSubmissions, mockCourses, mockEnrollments } from "@/lib/mock-data"
+import { useData } from "@/lib/data-context"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -17,45 +17,46 @@ export default function AssignmentPage() {
   const params = useParams()
   const router = useRouter()
   const { user, users } = useAuth()
+  const { courses, enrollments, assignments, submissions } = useData()
   const courseId = Number(params.courseId)
   const moduleId = Number(params.moduleId)
   const assignmentId = Number(params.assignmentId)
 
-  const assignment = mockAssignments.find((a) => a.id === assignmentId)
+  const assignment = assignments.find((a) => a.id === assignmentId)
   if (!assignment) return <div className="p-6"><h1>Assignment not found</h1></div>
   if (!user) return null
 
-  const course = mockCourses.find((c) => c.id === courseId)
+  const course = courses.find((c) => c.id === courseId)
   const isFacilitator = course?.facilitatorId === user.id || user.role === "Admin"
 
   if (isFacilitator) {
-    return <FacilitatorGradingView assignment={assignment} courseId={courseId} moduleId={moduleId} users={users} router={router} />
+    return <FacilitatorGradingView assignment={assignment} courseId={courseId} moduleId={moduleId} users={users} router={router} enrollments={enrollments} submissions={submissions} />
   }
 
-  return <StudentAssignmentView assignment={assignment} courseId={courseId} moduleId={moduleId} userId={user.id} router={router} />
+  return <StudentAssignmentView assignment={assignment} courseId={courseId} moduleId={moduleId} userId={user.id} router={router} submissions={submissions} />
 }
 
-function FacilitatorGradingView({ assignment, courseId, moduleId, users, router }: {
+function FacilitatorGradingView({ assignment, courseId, moduleId, users, router, enrollments, submissions }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  assignment: any; courseId: number; moduleId: number; users: any[]; router: any
+  assignment: any; courseId: number; moduleId: number; users: any[]; router: any; enrollments: { userId: number; courseId: number }[]; submissions: any[]
 }) {
-  const [submissions, setSubmissions] = useState(() =>
-    mockSubmissions.filter((s) => s.activityId === assignment.id && s.activityType === "assignment")
+  const [localSubmissions, setLocalSubmissions] = useState(() =>
+    submissions.filter((s) => s.activityId === assignment.id && s.activityType === "assignment")
   )
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [gradingSub, setGradingSub] = useState<any>(null)
   const [marks, setMarks] = useState("")
   const [feedback, setFeedback] = useState("")
 
-  const enrolledStudents = mockEnrollments.filter((e) => e.courseId === courseId)
-  const notSubmitted = enrolledStudents.filter((e) => !submissions.some((s) => s.userId === e.userId))
+  const enrolledStudents = enrollments.filter((e) => e.courseId === courseId)
+  const notSubmitted = enrolledStudents.filter((e) => !localSubmissions.some((s) => s.userId === e.userId))
 
   const handleGrade = () => {
     if (!marks || isNaN(Number(marks))) {
       toast.error("Please enter valid marks")
       return
     }
-    const sub = mockSubmissions.find((s) => s.id === gradingSub.id)
+    const sub = submissions.find((s) => s.id === gradingSub.id)
     if (sub) {
       sub.marks = Number(marks)
       sub.totalMarks = 100
@@ -64,7 +65,7 @@ function FacilitatorGradingView({ assignment, courseId, moduleId, users, router 
       sub.gradedAt = new Date().toISOString()
       sub.gradedBy = users.find((u) => u.role === "Facilitator" || u.role === "Admin")?.id || 0
     }
-    setSubmissions(mockSubmissions.filter((s) => s.activityId === assignment.id && s.activityType === "assignment"))
+    setLocalSubmissions(submissions.filter((s) => s.activityId === assignment.id && s.activityType === "assignment"))
     setGradingSub(null)
     setMarks("")
     setFeedback("")
@@ -93,7 +94,7 @@ function FacilitatorGradingView({ assignment, courseId, moduleId, users, router 
         </div>
       </div>
 
-      {submissions.length === 0 && notSubmitted.length > 0 && (
+      {localSubmissions.length === 0 && notSubmitted.length > 0 && (
         <Card className="border-0 shadow-card animate-slide-up" style={{ animationDelay: "60ms" }}>
           <CardHeader><CardTitle>No Submissions Yet</CardTitle></CardHeader>
           <CardContent>
@@ -103,14 +104,14 @@ function FacilitatorGradingView({ assignment, courseId, moduleId, users, router 
       )}
 
       <div className="space-y-4 animate-slide-up" style={{ animationDelay: "80ms" }}>
-        {submissions.length === 0 && notSubmitted.length === 0 && (
+        {localSubmissions.length === 0 && notSubmitted.length === 0 && (
           <Card className="border-0 shadow-card">
             <CardContent className="text-center py-12 text-muted-foreground">
               {enrolledStudents.length === 0 ? "No students enrolled in this course." : "No submissions yet."}
             </CardContent>
           </Card>
         )}
-        {submissions.map((sub) => {
+        {localSubmissions.map((sub) => {
           const student = users.find((u) => u.id === sub.userId)
           return (
             <Card key={sub.id} className="border-0 shadow-card card-hover">
@@ -190,14 +191,14 @@ function FacilitatorGradingView({ assignment, courseId, moduleId, users, router 
   )
 }
 
-function StudentAssignmentView({ assignment, courseId, moduleId, userId, router }: {
+function StudentAssignmentView({ assignment, courseId, moduleId, userId, router, submissions }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  assignment: any; courseId: number; moduleId: number; userId: number; router: any
+  assignment: any; courseId: number; moduleId: number; userId: number; router: any; submissions: any[]
 }) {
   const [content, setContent] = useState("")
   const [file, setFile] = useState<File | null>(null)
 
-  const existingSub = mockSubmissions.find((s) => s.userId === userId && s.activityId === assignment.id && s.activityType === "assignment")
+  const existingSub = submissions.find((s) => s.userId === userId && s.activityId === assignment.id && s.activityType === "assignment")
   const canResubmit = existingSub?.resubmissionAllowed
   const initialSubmitted = !!existingSub && !canResubmit
   const [submitted, setSubmitted] = useState(initialSubmitted)
@@ -209,13 +210,13 @@ function StudentAssignmentView({ assignment, courseId, moduleId, userId, router 
       toast.error("Please provide your submission content or file")
       return
     }
-    const subIdx = mockSubmissions.findIndex(
+    const subIdx = submissions.findIndex(
       (s) => s.userId === userId && s.activityId === assignment.id && s.activityType === "assignment"
     )
     const hasExisting = subIdx >= 0
-    if (hasExisting && mockSubmissions[subIdx].resubmissionAllowed) {
-      mockSubmissions[subIdx] = {
-        ...mockSubmissions[subIdx],
+    if (hasExisting && submissions[subIdx].resubmissionAllowed) {
+      submissions[subIdx] = {
+        ...submissions[subIdx],
         content: content || (file ? file.name : ""),
         submittedAt: new Date().toISOString(),
         graded: false,
@@ -226,8 +227,8 @@ function StudentAssignmentView({ assignment, courseId, moduleId, userId, router 
       return
     }
     if (!hasExisting) {
-      mockSubmissions.push({
-        id: mockSubmissions.length + 1,
+      submissions.push({
+        id: submissions.length + 1,
         userId,
         activityId: assignment.id,
         activityType: "assignment",

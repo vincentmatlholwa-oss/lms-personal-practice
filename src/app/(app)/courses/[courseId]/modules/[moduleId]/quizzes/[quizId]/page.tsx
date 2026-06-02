@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
-import { mockQuizzes, mockSubmissions } from "@/lib/mock-data"
+import { useData } from "@/lib/data-context"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -15,11 +15,12 @@ export default function QuizPage() {
   const params = useParams()
   const router = useRouter()
   const { user } = useAuth()
+  const { quizzes, submissions } = useData()
   const courseId = Number(params.courseId)
   const moduleId = Number(params.moduleId)
   const quizId = Number(params.quizId)
 
-  const existing = user ? mockSubmissions.find((s) => s.userId === user.id && s.activityId === quizId && s.activityType === "quiz") : undefined
+  const existing = user ? submissions.find((s) => s.userId === user.id && s.activityId === quizId && s.activityType === "quiz") : undefined
   const [answers, setAnswers] = useState<Record<number, number>>(
     existing ? JSON.parse(existing.content) : {}
   )
@@ -28,7 +29,7 @@ export default function QuizPage() {
 
   if (!user) return null
 
-  const quiz = mockQuizzes.find((q) => q.id === quizId)
+  const quiz = quizzes.find((q) => q.id === quizId)
   if (!quiz) return <div className="p-6"><h1>Quiz not found</h1></div>
 
   const handleSubmit = () => {
@@ -43,8 +44,8 @@ export default function QuizPage() {
       total += q.markAllocation
       if (answers[q.id] === q.correctAnswer) score += q.markAllocation
     })
-    mockSubmissions.push({
-      id: mockSubmissions.length + 1,
+    submissions.push({
+      id: submissions.length + 1,
       userId: user.id,
       activityId: quizId,
       activityType: "quiz",
@@ -140,7 +141,7 @@ export default function QuizPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 ml-7">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 ml-7">
                       {q.answers.map((answer, ai) => {
                         let className = "p-2 rounded-md text-sm border "
                         if (ai === q.correctAnswer) {
@@ -179,7 +180,7 @@ export default function QuizPage() {
                     value={answers[q.id]?.toString()}
                     onValueChange={(v) => setAnswers({ ...answers, [q.id]: parseInt(v) })}
                   >
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {q.answers.map((answer, ai) => (
                         <div key={ai} className="flex items-center gap-2 p-2 rounded-md hover:bg-accent">
                           <RadioGroupItem value={ai.toString()} id={`q${q.id}-a${ai}`} />

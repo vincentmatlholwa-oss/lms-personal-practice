@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "../../../lib/auth-context"
-import { mockCourses as sharedCourses, mockEnrollments, mockModules } from "../../../lib/mock-data"
+import { useData } from "../../../lib/data-context"
 import { Button } from "../../../components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card"
 import {
@@ -39,8 +39,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../../components/ui/select"
+import { EmptyState } from "../../../components/empty-state"
 import { Badge } from "../../../components/ui/badge"
-import { Plus, MoreVertical, Eye, Pencil, Trash2, Ban, Play, UserPlus, UserMinus, GraduationCap, Search, BookOpen, ArrowLeft } from "lucide-react"
+import { Plus, MoreVertical, Eye, Pencil, Trash2, Ban, Play, UserPlus, UserMinus, GraduationCap, Search, BookOpen, ArrowLeft, BookX } from "lucide-react"
 import { toast } from "sonner"
 
 const facilitatorNames: Record<number, string> = {
@@ -55,7 +56,7 @@ type Course = {
   facilitator: string
   facilitatorId: number | null
   students: number
-  status: string
+  status: "Active" | "Suspended" | "Draft" | "Archived"
   startDate: string
   endDate: string
 }
@@ -63,20 +64,20 @@ type Course = {
 export default function Courses() {
   const { user, users } = useAuth()
   const router = useRouter()
-  const [courses, setCourses] = useState(() =>
-    sharedCourses.map((c) => ({
+  const { courses: allCourses, modules, enrollments, setEnrollments } = useData()
+  const [courses, setCourses] = useState<Course[]>(() =>
+    allCourses.map((c) => ({
       id: c.id,
       title: c.title,
       description: c.description,
       facilitator: c.facilitatorId ? facilitatorNames[c.facilitatorId] || "Unassigned" : "Unassigned",
       facilitatorId: c.facilitatorId,
-      students: mockEnrollments.filter((e) => e.courseId === c.id).length,
-      status: c.status === "Suspended" ? "Suspended" : "Draft",
+      students: enrollments.filter((e) => e.courseId === c.id).length,
+      status: c.status as Course["status"],
       startDate: c.startDate,
       endDate: c.endDate,
     }))
   )
-  const [enrollments, setEnrollments] = useState(() => [...mockEnrollments])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isFacilitatorDialogOpen, setIsFacilitatorDialogOpen] = useState(false)
   const [editingCourse, setEditingCourse] = useState<Course | null>(null)
@@ -114,26 +115,26 @@ export default function Courses() {
   })
 
   const handleCreateCourse = () => {
-    const course = {
+    const course: Course = {
       id: courses.length + 1,
       title: newCourse.title,
       description: newCourse.description,
       facilitator: newCourse.facilitator,
       facilitatorId: newCourse.facilitatorId,
       students: 0,
-      status: newCourse.status,
+      status: newCourse.status as "Active" | "Suspended" | "Draft" | "Archived",
       startDate: newCourse.startDate,
       endDate: newCourse.endDate,
     }
     setCourses([...courses, course])
-    sharedCourses.push({
+    allCourses.push({
       id: course.id,
       title: course.title,
       description: course.description,
       startDate: course.startDate,
       endDate: course.endDate,
       facilitatorId: course.facilitatorId,
-      status: course.status === "Suspended" ? "Suspended" : "Active",
+      status: (course.status === "Suspended" ? "Suspended" : "Active") as "Active" | "Suspended",
     })
     setIsDialogOpen(false)
     toast.success("Course created successfully")
@@ -153,16 +154,16 @@ export default function Courses() {
     setCourses(courses.map(c =>
       c.id === editingCourse.id ? editingCourse : c
     ))
-    const idx = sharedCourses.findIndex((c) => c.id === editingCourse.id)
+    const idx = allCourses.findIndex((c) => c.id === editingCourse.id)
     if (idx !== -1) {
-      sharedCourses[idx] = {
-        ...sharedCourses[idx],
+      allCourses[idx] = {
+        ...allCourses[idx],
         title: editingCourse.title,
         description: editingCourse.description,
         startDate: editingCourse.startDate,
         endDate: editingCourse.endDate,
         facilitatorId: editingCourse.facilitatorId,
-        status: editingCourse.status === "Suspended" ? "Suspended" : "Active",
+        status: (editingCourse.status === "Suspended" ? "Suspended" : "Active") as "Active" | "Suspended",
       }
     }
     setEditingCourse(null)
@@ -171,16 +172,16 @@ export default function Courses() {
 
   const handleDeleteCourse = (id: number) => {
     setCourses(courses.filter((course) => course.id !== id))
-    const idx = sharedCourses.findIndex((c) => c.id === id)
-    if (idx !== -1) sharedCourses.splice(idx, 1)
+    const idx = allCourses.findIndex((c) => c.id === id)
+    if (idx !== -1) allCourses.splice(idx, 1)
   }
 
   const handleSuspendCourse = (id: number) => {
     setCourses(courses.map(c => {
       if (c.id !== id) return c
       const newStatus = c.status === "Suspended" ? "Active" : "Suspended"
-      const idx = sharedCourses.findIndex((s) => s.id === id)
-      if (idx !== -1) sharedCourses[idx] = { ...sharedCourses[idx], status: newStatus === "Suspended" ? "Suspended" : "Active" }
+      const idx = allCourses.findIndex((s) => s.id === id)
+      if (idx !== -1) allCourses[idx] = { ...allCourses[idx], status: (newStatus === "Suspended" ? "Suspended" : "Active") as "Active" | "Suspended" }
       return { ...c, status: newStatus }
     }))
   }
@@ -227,6 +228,7 @@ export default function Courses() {
       case "Active": return "bg-success text-white hover:bg-success/90 border-0"
       case "Suspended": return "bg-warning text-white hover:bg-warning/90 border-0"
       case "Draft": return "bg-muted text-muted-foreground border-0"
+      case "Archived": return "bg-destructive/10 text-destructive border-0"
       default: return ""
     }
   }
@@ -254,7 +256,7 @@ export default function Courses() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 animate-slide-up" style={{ animationDelay: "120ms" }}>
           {filtered.map((course) => {
-            const courseModules = mockModules.filter((m) => m.courseId === course.id)
+            const courseModules = modules.filter((m) => m.courseId === course.id)
             const isEnrolled = enrolledIds.includes(course.id)
             return (
               <Card key={course.id} className="card-hover border-0 shadow-card">
@@ -280,8 +282,7 @@ export default function Courses() {
                     {course.status !== "Suspended" && (
                       <Button size="sm" disabled={isEnrolled} onClick={() => {
                         if (!isEnrolled && user) {
-                          setEnrollments((prev) => [...prev, { userId: user.id, courseId: course.id }])
-                          mockEnrollments.push({ userId: user.id, courseId: course.id })
+                          setEnrollments([...enrollments, { userId: user.id, courseId: course.id }])
                           setCourses((prev) => prev.map((c) =>
                             c.id === course.id ? { ...c, students: c.students + 1 } : c
                           ))
@@ -363,7 +364,7 @@ export default function Courses() {
                   rows={4}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="start-date">Start Date</Label>
                   <Input
@@ -419,8 +420,8 @@ export default function Courses() {
                 <Select
                   value={editingCourse ? editingCourse.status : newCourse.status}
                   onValueChange={(value) => editingCourse
-                    ? setEditingCourse({ ...editingCourse, status: value })
-                    : setNewCourse({ ...newCourse, status: value })
+                    ? setEditingCourse({ ...editingCourse, status: value as Course["status"] })
+                    : setNewCourse({ ...newCourse, status: value as Course["status"] })
                   }
                 >
                   <SelectTrigger id="course-status">
@@ -545,6 +546,15 @@ export default function Courses() {
               ))}
             </TableBody>
           </Table>
+          {filtered.length === 0 && (
+            <div className="p-8">
+              <EmptyState
+                icon={<BookX className="w-12 h-12 text-muted-foreground" />}
+                title="No courses found"
+                description={search ? "Try a different search term." : "No courses match the selected filters."}
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 

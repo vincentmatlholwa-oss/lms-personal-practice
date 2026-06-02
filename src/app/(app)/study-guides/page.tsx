@@ -1,7 +1,7 @@
 "use client"
 
 import { useAuth } from "../../../lib/auth-context"
-import { mockCourses, mockModules, mockEnrollments } from "../../../lib/mock-data"
+import { useData } from "../../../lib/data-context"
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card"
 import { Button } from "../../../components/ui/button"
 import { useRouter } from "next/navigation"
@@ -10,11 +10,12 @@ import { BookOpen, Download, FileText, GraduationCap, ArrowLeft } from "lucide-r
 export default function StudyGuidesPage() {
   const { user } = useAuth()
   const router = useRouter()
+  const { courses, modules, enrollments } = useData()
 
   if (!user) return null
 
-  const myEnrollments = mockEnrollments.filter((e) => e.userId === user.id)
-  const myCourses = mockCourses.filter((c) => myEnrollments.some((e) => e.courseId === c.id))
+  const myEnrollments = enrollments.filter((e) => e.userId === user.id)
+  const myCourses = courses.filter((c) => myEnrollments.some((e) => e.courseId === c.id))
 
   return (
     <div className="p-6 lg:p-8 space-y-6 animate-fade-in">
@@ -40,7 +41,7 @@ export default function StudyGuidesPage() {
       ) : (
         <div className="space-y-4 animate-slide-up" style={{ animationDelay: "80ms" }}>
           {myCourses.map((course) => {
-            const courseModules = mockModules.filter((m) => m.courseId === course.id)
+            const courseModules = modules.filter((m) => m.courseId === course.id)
             return (
               <Card key={course.id} className="border-0 shadow-card card-hover">
                 <CardHeader>

@@ -1,0 +1,314 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        Int    @id @default(autoincrement())
+  firstName String
+  lastName  String
+  email     String @unique
+  password  String
+  role      String @default("Student")
+  status    String @default("Active")
+  phone     String @default("")
+  idNumber  String @default("")
+  avatar    String?
+
+  enrollments              Enrollment[]
+  authoredAnnouncements    Announcement[]          @relation("AnnouncementAuthor")
+  notifications            Notification[]
+  submissions              Submission[]
+  discussions              Discussion[]
+  discussionReplies        DiscussionReply[]
+  courseReviews            CourseReview[]
+  certificates             Certificate[]
+  facilitatorApplications  FacilitatorApplication[]
+  courseProgress           CourseProgress[]
+  gradebookEntries         GradebookEntry[]
+  facilitatedCourses       Course[]                 @relation("CourseFacilitator")
+  gradedSubmissions        Submission[]             @relation("GradedBy")
+}
+
+model Course {
+  id            Int    @id @default(autoincrement())
+  title         String
+  description   String
+  startDate     String
+  endDate       String
+  facilitatorId Int?
+  status        String @default("Active")
+
+  facilitator       User?              @relation("CourseFacilitator", fields: [facilitatorId], references: [id])
+  modules           Module[]
+  enrollments       Enrollment[]
+  announcements     Announcement[]
+  discussions       Discussion[]
+  courseReviews     CourseReview[]
+  certificates      Certificate[]
+  courseProgress    CourseProgress[]
+  calendarEvents    CalendarEvent[]
+  assignments       Assignment[]
+  gradebookEntries  GradebookEntry[]
+}
+
+model Enrollment {
+  userId   Int
+  courseId Int
+
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@id([userId, courseId])
+}
+
+model Module {
+  id          Int    @id @default(autoincrement())
+  courseId    Int
+  title       String
+  description String
+  order       Int
+
+  course      Course       @relation(fields: [courseId], references: [id])
+  lessons     Lesson[]
+  quizzes     Quiz[]
+  tests       Test[]
+  assignments Assignment[]
+}
+
+model Lesson {
+  id        Int    @id @default(autoincrement())
+  moduleId  Int
+  title     String
+  content   String
+  resources String @default("[]")
+  order     Int
+
+  module     Module     @relation(fields: [moduleId], references: [id])
+  activities Activity[]
+}
+
+model Activity {
+  id          Int  @id @default(autoincrement())
+  lessonId    Int
+  title       String
+  description String
+  type        String
+  dueDate     String
+  timeLimit   Int?
+
+  lesson Lesson @relation(fields: [lessonId], references: [id])
+}
+
+model Quiz {
+  id          Int    @id @default(autoincrement())
+  activityId  Int?
+  moduleId    Int
+  title       String
+  description String
+  dueDate     String
+  timeLimit   Int
+  questions   QuizQuestion[]
+
+  module Module @relation(fields: [moduleId], references: [id])
+}
+
+model QuizQuestion {
+  id             Int  @id @default(autoincrement())
+  quizId         Int
+  question       String
+  answers        String @default("[]")
+  correctAnswer  Int
+  markAllocation Int
+
+  quiz Quiz @relation(fields: [quizId], references: [id])
+}
+
+model Test {
+  id          Int    @id @default(autoincrement())
+  activityId  Int?
+  moduleId    Int
+  title       String
+  description String
+  dueDate     String
+  timeLimit   Int
+  questions   TestQuestion[]
+
+  module Module @relation(fields: [moduleId], references: [id])
+}
+
+model TestQuestion {
+  id             Int  @id @default(autoincrement())
+  testId         Int
+  question       String
+  markAllocation Int
+
+  test Test @relation(fields: [testId], references: [id])
+}
+
+model Assignment {
+  id          Int     @id @default(autoincrement())
+  moduleId    Int
+  courseId    Int
+  title       String
+  description String
+  dueDate     String
+  timeLimit   Int?
+  attachments String  @default("[]")
+
+  module Module @relation(fields: [moduleId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+}
+
+model GradebookEntry {
+  id           Int   @id @default(autoincrement())
+  userId       Int
+  courseId     Int
+  activityName String
+  activityType String
+  score        Float
+  total        Float
+  date         String
+
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+}
+
+model Submission {
+  id                  Int     @id @default(autoincrement())
+  userId              Int
+  activityId          Int
+  activityType        String
+  content             String
+  submittedAt         String
+  marks               Float?
+  totalMarks          Float?
+  graded              Boolean @default(false)
+  feedback            String?
+  gradedAt            String?
+  gradedBy            Int?
+  resubmissionAllowed Boolean @default(false)
+
+  user   User  @relation(fields: [userId], references: [id])
+  grader User? @relation("GradedBy", fields: [gradedBy], references: [id])
+}
+
+model Announcement {
+  id             Int     @id @default(autoincrement())
+  title          String
+  description    String
+  date           String
+  priority       String  @default("Medium")
+  attachment     String?
+  image          String?
+  authorId       Int
+  courseId       Int?
+  targetAudience String  @default("All")
+
+  author User   @relation("AnnouncementAuthor", fields: [authorId], references: [id])
+  course Course? @relation(fields: [courseId], references: [id])
+}
+
+model Notification {
+  id      Int     @id @default(autoincrement())
+  userId  Int
+  title   String
+  message String
+  date    String
+  read    Boolean @default(false)
+  link    String?
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model CalendarEvent {
+  id       Int     @id @default(autoincrement())
+  title    String
+  date     String
+  type     String
+  courseId Int?
+
+  course Course? @relation(fields: [courseId], references: [id])
+}
+
+model CourseProgress {
+  id                 Int    @id @default(autoincrement())
+  userId             Int
+  courseId           Int
+  completedModuleIds String @default("[]")
+  completedLessonIds String @default("[]")
+  completedAt        String?
+
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@unique([userId, courseId])
+}
+
+model Discussion {
+  id       Int      @id @default(autoincrement())
+  courseId  Int
+  moduleId  Int?
+  lessonId  Int?
+  userId    Int
+  title     String
+  content   String
+  createdAt String
+  pinned    Boolean  @default(false)
+  resolved  Boolean  @default(false)
+
+  user    User             @relation(fields: [userId], references: [id])
+  course  Course           @relation(fields: [courseId], references: [id])
+  replies DiscussionReply[]
+}
+
+model DiscussionReply {
+  id           Int    @id @default(autoincrement())
+  discussionId Int
+  userId       Int
+  content      String
+  createdAt    String
+  attachments  String @default("[]")
+
+  discussion Discussion @relation(fields: [discussionId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+}
+
+model CourseReview {
+  id        Int    @id @default(autoincrement())
+  userId    Int
+  courseId   Int
+  rating    Int
+  comment   String
+  createdAt String
+
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+}
+
+model Certificate {
+  id            Int    @id @default(autoincrement())
+  userId        Int
+  courseId       Int
+  issuedAt      String
+  certificateId String
+
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+}
+
+model FacilitatorApplication {
+  id             Int    @id @default(autoincrement())
+  userId         Int    @unique
+  subject        String
+  qualifications String
+  experience     String
+  date           String
+  status         String @default("Pending")
+
+  user User @relation(fields: [userId], references: [id])
+}

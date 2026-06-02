@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "../../../../lib/auth-context"
-import { mockCourses, mockModules, mockEnrollments } from "../../../../lib/mock-data"
+import { useData } from "../../../../lib/data-context"
 import { Card, CardContent, CardHeader, CardTitle } from "../../../../components/ui/card"
 import { Badge } from "../../../../components/ui/badge"
 import { Button } from "../../../../components/ui/button"
@@ -15,9 +15,9 @@ import { toast } from "sonner"
 
 export default function CoursesCatalog() {
   const { user, users } = useAuth()
+  const { courses, modules, setCourses, enrollments, setEnrollments } = useData()
   const router = useRouter()
   const [search, setSearch] = useState("")
-  const [courses, setCourses] = useState(mockCourses)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [newCourse, setNewCourse] = useState({ title: "", description: "", startDate: "", endDate: "" })
 
@@ -26,7 +26,7 @@ export default function CoursesCatalog() {
   const isAdmin = user.role === "Admin"
   const isFacilitator = user.role === "Facilitator"
 
-  const enrolledIds = mockEnrollments.filter((e) => e.userId === user.id).map((e) => e.courseId)
+  const enrolledIds = enrollments.filter((e) => e.userId === user.id).map((e) => e.courseId)
 
   const filtered = courses.filter((c) =>
     c.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -61,7 +61,7 @@ export default function CoursesCatalog() {
       toast.error("Already enrolled in this course")
       return
     }
-    mockEnrollments.push({ userId: user.id, courseId })
+    setEnrollments([...enrollments, { userId: user.id, courseId }])
     toast.success("Successfully enrolled!")
     router.refresh()
   }
@@ -128,7 +128,7 @@ export default function CoursesCatalog() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 animate-slide-up" style={{ animationDelay: "120ms" }}>
         {filtered.map((course) => {
-          const courseModules = mockModules.filter((m) => m.courseId === course.id)
+          const courseModules = modules.filter((m) => m.courseId === course.id)
           const facilitator = users.find((u) => u.id === course.facilitatorId)
           const isEnrolled = enrolledIds.includes(course.id)
 

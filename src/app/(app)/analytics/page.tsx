@@ -2,40 +2,38 @@
 
 import { useRouter } from "next/navigation"
 import { useAuth } from "../../../lib/auth-context"
-import {
-  mockCourses, mockEnrollments, mockModules, mockGradebook,
-  mockSubmissions, mockCourseProgress, mockUsers,
-} from "../../../lib/mock-data"
+import { useData } from "../../../lib/data-context"
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card"
 import { Badge } from "../../../components/ui/badge"
 import { BarChart3, ArrowLeft, BookOpen, Users, CheckCircle, Award, TrendingUp } from "lucide-react"
 
 export default function AnalyticsPage() {
-  const { user } = useAuth()
+  const { user, users } = useAuth()
   const router = useRouter()
+  const { courses, modules, enrollments, gradebook, submissions, courseProgress } = useData()
 
   if (!user || user.role !== "Admin") return <div className="p-6"><h1>Access denied</h1></div>
 
-  const totalStudents = mockUsers.filter((u) => u.role === "Student" && u.status === "Active").length
-  const totalFacilitators = mockUsers.filter((u) => u.role === "Facilitator" && u.status === "Active").length
-  const activeCourses = mockCourses.filter((c) => c.status === "Active").length
-  const totalEnrollments = mockEnrollments.length
+  const totalStudents = users.filter((u) => u.role === "Student" && u.status === "Active").length
+  const totalFacilitators = users.filter((u) => u.role === "Facilitator" && u.status === "Active").length
+  const activeCourses = courses.filter((c) => c.status === "Active").length
+  const totalEnrollments = enrollments.length
 
-  const courseStats = mockCourses.map((course) => {
-    const courseEnrollments = mockEnrollments.filter((e) => e.courseId === course.id).length
-    const courseMods = mockModules.filter((m) => m.courseId === course.id)
-    const completed = mockCourseProgress.filter((p) => p.courseId === course.id && p.completedModuleIds.length === courseMods.length).length
-    const grades = mockGradebook.filter((g) => g.courseId === course.id)
+  const courseStats = courses.map((course) => {
+    const courseEnrollments = enrollments.filter((e) => e.courseId === course.id).length
+    const courseMods = modules.filter((m) => m.courseId === course.id)
+    const completed = courseProgress.filter((p) => p.courseId === course.id && p.completedModuleIds.length === courseMods.length).length
+    const grades = gradebook.filter((g) => g.courseId === course.id)
     const avgGrade = grades.length > 0 ? Math.round(grades.reduce((s, g) => s + (g.score / g.total) * 100, 0) / grades.length) : null
     return { ...course, enrollments: courseEnrollments, completed, avgGrade, totalModules: courseMods.length }
   })
 
   const overallAvg = (() => {
-    const all = mockGradebook
+    const all = gradebook
     return all.length > 0 ? Math.round(all.reduce((s, g) => s + (g.score / g.total) * 100, 0) / all.length) : 0
   })()
 
-  const pendingGrading = mockSubmissions.filter((s) => s.activityType === "assignment" && !s.graded).length
+  const pendingGrading = submissions.filter((s) => s.activityType === "assignment" && !s.graded).length
 
   return (
     <div className="p-6 lg:p-8 space-y-6 animate-fade-in">
@@ -95,7 +93,7 @@ export default function AnalyticsPage() {
                       <p className="font-medium text-sm">{course.title}</p>
                       <Badge variant="outline" className="text-[10px]">{course.status}</Badge>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-muted-foreground">
                       <span>{course.enrollments} enrolled</span>
                       <span>{course.totalModules} modules</span>
                       <span>{course.avgGrade !== null ? `${course.avgGrade}% avg` : "N/A"}</span>
@@ -130,8 +128,8 @@ export default function AnalyticsPage() {
                 <p className="text-sm font-medium">Course Completions</p>
                 <p className="text-xs text-muted-foreground">Students who completed all modules</p>
               </div>
-              <span className="text-xl font-bold text-success">{mockCourseProgress.filter((p) => {
-                const courseMods = mockModules.filter((m) => m.courseId === p.courseId)
+              <span className="text-xl font-bold text-success">{courseProgress.filter((p) => {
+                const courseMods = modules.filter((m) => m.courseId === p.courseId)
                 return p.completedModuleIds.length === courseMods.length && courseMods.length > 0
               }).length}</span>
             </div>
@@ -148,7 +146,7 @@ export default function AnalyticsPage() {
                 <p className="text-xs text-muted-foreground">Pending approvals</p>
               </div>
               <span className="text-xl font-bold text-amber-500">
-                {mockUsers.filter((u) => u.role === "Facilitator" && u.status === "Pending").length}
+                {users.filter((u) => u.role === "Facilitator" && u.status === "Pending").length}
               </span>
             </div>
           </CardContent>

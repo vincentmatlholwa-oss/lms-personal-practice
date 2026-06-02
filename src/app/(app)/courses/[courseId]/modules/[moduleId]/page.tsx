@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "../../../../../../lib/auth-context"
-import { mockModules, mockLessons, mockQuizzes, mockAssignments, mockActivities } from "../../../../../../lib/mock-data"
+import { useData } from "../../../../../../lib/data-context"
 import { Card, CardContent, CardHeader, CardTitle } from "../../../../../../components/ui/card"
 import { Badge } from "../../../../../../components/ui/badge"
 import { Button } from "../../../../../../components/ui/button"
@@ -12,17 +12,18 @@ export default function ModuleDetail() {
   const params = useParams()
   const router = useRouter()
   const { user } = useAuth()
+  const { modules, quizzes, assignments, lessons, activities } = useData()
   const courseId = Number(params.courseId)
   const moduleId = Number(params.moduleId)
 
   if (!user) return null
 
-  const mod = mockModules.find((m) => m.id === moduleId && m.courseId === courseId)
+  const mod = modules.find((m) => m.id === moduleId && m.courseId === courseId)
   if (!mod) return <div className="p-6"><h1>Module not found</h1></div>
 
-  const lessons = mockLessons.filter((l) => l.moduleId === moduleId).sort((a, b) => a.order - b.order)
-  const quizzes = mockQuizzes.filter((q) => q.moduleId === moduleId)
-  const assignments = mockAssignments.filter((a) => a.moduleId === moduleId && a.courseId === courseId)
+  const moduleLessons = lessons.filter((l) => l.moduleId === moduleId).sort((a, b) => a.order - b.order)
+  const moduleQuizzes = quizzes.filter((q) => q.moduleId === moduleId)
+  const moduleAssignments = assignments.filter((a) => a.moduleId === moduleId && a.courseId === courseId)
 
   return (
     <div className="p-6 lg:p-8 space-y-6 animate-fade-in">
@@ -47,7 +48,7 @@ export default function ModuleDetail() {
       </div>
 
       <div className="space-y-4 animate-slide-up" style={{ animationDelay: "80ms" }}>
-        {lessons.map((lesson) => (
+        {moduleLessons.map((lesson) => (
           <Card key={lesson.id} className="border-0 shadow-card card-hover">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -71,7 +72,7 @@ export default function ModuleDetail() {
                 </div>
               )}
               {(() => {
-                const lessonActivities = mockActivities.filter((a) => a.lessonId === lesson.id)
+                const lessonActivities = activities.filter((a) => a.lessonId === lesson.id)
                 if (lessonActivities.length === 0) return null
                 return (
                   <div className="space-y-2 pt-2 border-t">
@@ -96,11 +97,11 @@ export default function ModuleDetail() {
         ))}
       </div>
 
-      {quizzes.length > 0 && (
+      {moduleQuizzes.length > 0 && (
         <div className="animate-slide-up" style={{ animationDelay: "100ms" }}>
           <h2 className="mb-3">Quizzes</h2>
           <div className="space-y-3">
-            {quizzes.map((quiz) => (
+            {moduleQuizzes.map((quiz) => (
               <Card key={quiz.id} className="border-0 shadow-card card-hover">
                 <CardContent className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-3">
@@ -120,11 +121,11 @@ export default function ModuleDetail() {
         </div>
       )}
 
-      {assignments.length > 0 && (
+      {moduleAssignments.length > 0 && (
         <div className="animate-slide-up" style={{ animationDelay: "120ms" }}>
           <h2 className="mb-3">Assignments</h2>
           <div className="space-y-3">
-            {assignments.map((assignment) => (
+            {moduleAssignments.map((assignment) => (
               <Card key={assignment.id} className="border-0 shadow-card card-hover">
                 <CardContent className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-3">

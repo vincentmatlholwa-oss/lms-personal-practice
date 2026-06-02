@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { useAuth } from "../../../lib/auth-context"
-import { mockCertificates, mockCourses, mockCourseProgress, mockModules } from "../../../lib/mock-data"
+import { useData } from "../../../lib/data-context"
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card"
 import { Button } from "../../../components/ui/button"
 import { Award, ArrowLeft, Download, GraduationCap } from "lucide-react"
@@ -11,30 +11,32 @@ import { toast } from "sonner"
 export default function CertificatesPage() {
   const { user } = useAuth()
   const router = useRouter()
+  const { courses, modules, courseProgress, certificates, setCertificates } = useData()
 
   if (!user) return null
 
-  const userCerts = mockCertificates.filter((c) => c.userId === user.id)
-  const myEnrolledCourses = mockCourses.filter((c) =>
-    mockCourseProgress.some((p) => p.userId === user.id && p.courseId === c.id)
+  const userCerts = certificates.filter((c) => c.userId === user.id)
+  const myEnrolledCourses = courses.filter((c) =>
+    courseProgress.some((p) => p.userId === user.id && p.courseId === c.id)
   )
 
   const issueCertificate = (courseId: number) => {
-    const course = mockCourses.find((c) => c.id === courseId)
+    const course = courses.find((c) => c.id === courseId)
     if (!course) return
-    const existing = mockCertificates.find((c) => c.userId === user.id && c.courseId === courseId)
+    const existing = certificates.find((c) => c.userId === user.id && c.courseId === courseId)
     if (existing) {
       toast.error("Certificate already issued")
       return
     }
-    const certId = `CERT-${user.id}-${courseId}-${mockCertificates.length + 1}`
-    mockCertificates.push({
-      id: mockCertificates.length + 1,
+    const certId = `CERT-${user.id}-${courseId}-${certificates.length + 1}`
+    const newCert = {
+      id: certificates.length + 1,
       userId: user.id,
       courseId,
       issuedAt: new Date().toISOString(),
       certificateId: certId,
-    })
+    }
+    setCertificates([...certificates, newCert])
     toast.success("Certificate issued! You can now download it.")
   }
 
@@ -68,7 +70,7 @@ export default function CertificatesPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-slide-up" style={{ animationDelay: "80ms" }}>
           {userCerts.map((cert) => {
-            const course = mockCourses.find((c) => c.id === cert.courseId)
+            const course = courses.find((c) => c.id === cert.courseId)
             return (
               <Card key={cert.id} className="border-0 shadow-card card-hover overflow-hidden">
                 <div className="h-2 bg-gradient-gold" />
@@ -102,8 +104,8 @@ export default function CertificatesPage() {
           <h2 className="mb-4">Complete a Course</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {myEnrolledCourses.map((course) => {
-              const progress = mockCourseProgress.find((p) => p.userId === user.id && p.courseId === course.id)
-              const courseMods = mockModules.filter((m) => m.courseId === course.id)
+              const progress = courseProgress.find((p) => p.userId === user.id && p.courseId === course.id)
+              const courseMods = modules.filter((m) => m.courseId === course.id)
               const completed = progress?.completedModuleIds.length || 0
               const pct = Math.round((completed / (courseMods.length || 1)) * 100)
               return (

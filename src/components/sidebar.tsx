@@ -2,52 +2,72 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useMemo, useCallback, useEffect } from "react"
 import {
   LayoutDashboard, BookOpen, Users, Megaphone, Settings, Calendar,
   BookOpenCheck, HelpCircle, FileText, UserCheck,
-  UserPlus, LogOut, Bell, BarChart3, Award,
+  UserPlus, LogOut, Bell, BarChart3, Award, X,
 } from "lucide-react"
 import { MdihubLogo } from "./mdihub-logo"
 import { cn } from "../lib/utils"
 import { useAuth } from "../lib/auth-context"
-import { mockNotifications, mockFacilitatorApplications } from "../lib/mock-data"
+import { useData } from "../lib/data-context"
 import { Avatar, AvatarFallback } from "./ui/avatar"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
+import { useSidebar } from "./sidebar-provider"
+
+const navItems: { path: string; label: string; icon: React.ComponentType<{ className?: string }>; roles: string[] }[] = [
+  { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["Student", "Facilitator", "Admin"] },
+  { path: "/my-courses", label: "My Courses", icon: BookOpenCheck, roles: ["Student"] },
+  { path: "/courses", label: "Courses", icon: BookOpen, roles: ["Student", "Facilitator", "Admin"] },
+  { path: "/calendar", label: "Calendar", icon: Calendar, roles: ["Student", "Facilitator"] },
+  { path: "/announcements", label: "Announcements", icon: Megaphone, roles: ["Student", "Facilitator", "Admin"] },
+  { path: "/notifications", label: "Notifications", icon: Bell, roles: ["Student", "Facilitator", "Admin"] },
+  { path: "/analytics", label: "Analytics", icon: BarChart3, roles: ["Admin"] },
+  { path: "/facilitator/applications", label: "Pending Approvals", icon: UserPlus, roles: ["Admin"] },
+  { path: "/users", label: "Users", icon: Users, roles: ["Admin"] },
+  { path: "/study-guides", label: "Study Guides", icon: FileText, roles: ["Student"] },
+  { path: "/certificates", label: "Certificates", icon: Award, roles: ["Student"] },
+  { path: "/profile", label: "Profile", icon: UserCheck, roles: ["Student", "Facilitator", "Admin"] },
+  { path: "/settings", label: "Settings", icon: Settings, roles: ["Student", "Facilitator", "Admin"] },
+  { path: "/help", label: "Help", icon: HelpCircle, roles: ["Student", "Facilitator", "Admin"] },
+]
 
 export function Sidebar() {
   const pathname = usePathname()
   const { user, signOut } = useAuth()
   const router = useRouter()
   const role = user?.role
+  const { open, setOpen } = useSidebar()
+  const { notifications, facilitatorApplications } = useData()
 
-  const navItems = [
-    { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["Student", "Facilitator", "Admin"] },
-    { path: "/my-courses", label: "My Courses", icon: BookOpenCheck, roles: ["Student"] },
-    { path: "/courses", label: "Courses", icon: BookOpen, roles: ["Student", "Facilitator", "Admin"] },
-    { path: "/calendar", label: "Calendar", icon: Calendar, roles: ["Student", "Facilitator"] },
-    { path: "/announcements", label: "Announcements", icon: Megaphone, roles: ["Student", "Facilitator", "Admin"] },
-    { path: "/notifications", label: "Notifications", icon: Bell, roles: ["Student", "Facilitator", "Admin"] },
-    { path: "/analytics", label: "Analytics", icon: BarChart3, roles: ["Admin"] },
-    { path: "/facilitator/applications", label: "Pending Approvals", icon: UserPlus, roles: ["Admin"] },
-    { path: "/users", label: "Users", icon: Users, roles: ["Admin"] },
-    { path: "/study-guides", label: "Study Guides", icon: FileText, roles: ["Student"] },
-    { path: "/certificates", label: "Certificates", icon: Award, roles: ["Student"] },
-    { path: "/profile", label: "Profile", icon: UserCheck, roles: ["Student", "Facilitator", "Admin"] },
-    { path: "/settings", label: "Settings", icon: Settings, roles: ["Student", "Facilitator", "Admin"] },
-    { path: "/help", label: "Help", icon: HelpCircle, roles: ["Student", "Facilitator", "Admin"] },
-  ]
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false) }
+    document.addEventListener("keydown", handler)
+    return () => document.removeEventListener("keydown", handler)
+  }, [open, setOpen])
 
-  const filtered = navItems.filter((item) => item.roles.includes(role || "Student"))
+  const filtered = useMemo(
+    () => navItems.filter((item) => item.roles.includes(role || "Student")),
+    [role]
+  )
 
-  const unreadCount = mockNotifications.filter((n) => n.userId === user?.id && !n.read).length
-  const pendingCount = mockFacilitatorApplications.filter((a) => a.status === "Pending").length
+  const unreadCount = useMemo(
+    () => notifications.filter((n) => n.userId === user?.id && !n.read).length,
+    [user?.id]
+  )
+  const pendingCount = useMemo(
+    () => facilitatorApplications.filter((a) => a.status === "Pending").length,
+    []
+  )
 
-  const getBadge = (path: string): number | null => {
+  const getBadge = useCallback((path: string): number | null => {
     if (path === "/announcements" && unreadCount > 0) return unreadCount
     if (path === "/facilitator/applications" && pendingCount > 0) return pendingCount
     return null
-  }
+  }, [unreadCount, pendingCount])
 
   const handleSignOut = () => {
     signOut()
@@ -55,16 +75,19 @@ export function Sidebar() {
     router.push("/signin")
   }
 
-  return (
-    <aside className="w-64 bg-sidebar text-sidebar-foreground flex flex-col shrink-0 h-screen sticky top-0">
-      <div className="p-6 border-b border-sidebar-border">
-        <Link href="/dashboard" className="flex items-center gap-3">
+  const sidebarContent = (
+    <>
+      <div className="p-6 border-b border-sidebar-border flex items-center justify-between">
+        <Link href="/dashboard" className="flex items-center gap-3" onClick={() => setOpen(false)}>
           <MdihubLogo width={36} height={36} />
           <div>
             <h1 className="text-sidebar-foreground text-sm font-semibold tracking-tight">MDiHub</h1>
             <p className="text-[10px] text-sidebar-foreground/40 tracking-wider uppercase">Learning Platform</p>
           </div>
         </Link>
+        <button onClick={() => setOpen(false)} className="lg:hidden text-sidebar-foreground/60 hover:text-sidebar-foreground">
+          <X className="w-5 h-5" />
+        </button>
       </div>
       <nav className="flex-1 p-3 overflow-y-auto space-y-1">
         {filtered.map((item) => {
@@ -75,6 +98,7 @@ export function Sidebar() {
             <Link
               key={item.path}
               href={item.path}
+              onClick={() => setOpen(false)}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-sm group",
                 isActive
@@ -120,6 +144,22 @@ export function Sidebar() {
           </button>
         </div>
       </div>
-    </aside>
+    </>
+  )
+
+  return (
+    <>
+      <aside className="hidden lg:flex w-64 bg-sidebar text-sidebar-foreground flex-col shrink-0 h-screen sticky top-0">
+        {sidebarContent}
+      </aside>
+      {open && (
+        <div className="fixed inset-0 z-50 flex lg:hidden">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setOpen(false)} />
+          <aside className="relative w-64 bg-sidebar text-sidebar-foreground flex flex-col h-full shadow-2xl animate-slide-in-left">
+            {sidebarContent}
+          </aside>
+        </div>
+      )}
+    </>
   )
 }

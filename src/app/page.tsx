@@ -136,7 +136,7 @@ export default function LandingPage() {
 
       <section className="border-y bg-muted/30">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-2 gap-8 lg:grid-cols-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 lg:grid-cols-4">
             {stats.map((stat, i) => (
               <div key={stat.label} className="text-center animate-fade-in" style={{ animationDelay: `${i * 100}ms` }}>
                 <p className="text-2xl sm:text-3xl font-bold text-gradient-gold">{stat.value}</p>

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "../../../lib/auth-context"
-import { mockAnnouncements as initialAnnouncements, mockCourses } from "../../../lib/mock-data"
+import { useData } from "../../../lib/data-context"
 import { Button } from "../../../components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card"
 import {
@@ -14,13 +14,14 @@ import { Label } from "../../../components/ui/label"
 import { Textarea } from "../../../components/ui/textarea"
 import { Badge } from "../../../components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select"
-import { Plus, Megaphone, Trash2, Calendar, ArrowLeft } from "lucide-react"
+import { EmptyState } from "../../../components/empty-state"
+import { Plus, Megaphone, Trash2, Calendar, ArrowLeft, VolumeX } from "lucide-react"
 import { toast } from "sonner"
 
 export default function Announcements() {
   const { user } = useAuth()
+  const { announcements, setAnnouncements, courses } = useData()
   const router = useRouter()
-  const [announcements, setAnnouncements] = useState(initialAnnouncements)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [courseFilter, setCourseFilter] = useState("all")
   const [newAnnouncement, setNewAnnouncement] = useState({
@@ -28,8 +29,9 @@ export default function Announcements() {
     content: "",
     priority: "Medium",
     targetAudience: "All",
-    courseId: "",
+    courseId: "none",
   })
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const canCreate = user?.role === "Admin" || user?.role === "Facilitator"
 
   const filtered = announcements.filter((a) => {
@@ -38,32 +40,47 @@ export default function Announcements() {
     return a.courseId === Number(courseFilter)
   })
 
-  const handleCreateAnnouncement = () => {
+  const handleCreateAnnouncement = async () => {
     if (!newAnnouncement.title || !newAnnouncement.content) {
       toast.error("Title and content are required")
       return
     }
-    const announcement = {
-      id: announcements.length + 1,
-      title: newAnnouncement.title,
-      description: newAnnouncement.content,
-      date: new Date().toISOString().split('T')[0],
-      priority: newAnnouncement.priority as "High" | "Medium" | "Low",
-      authorId: user?.id || 0,
-      targetAudience: newAnnouncement.targetAudience as "All" | "Students" | "Facilitators" | "Admins",
-      courseId: newAnnouncement.courseId ? Number(newAnnouncement.courseId) : undefined,
+    setIsSubmitting(true)
+    try {
+      const token = sessionStorage.getItem("lms_token")
+      const res = await fetch("/api/announcements", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: newAnnouncement.title,
+          description: newAnnouncement.content,
+          priority: newAnnouncement.priority,
+          targetAudience: newAnnouncement.targetAudience,
+          courseId: newAnnouncement.courseId !== "none" ? Number(newAnnouncement.courseId) : null,
+          authorId: user?.id,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || "Failed to create announcement")
+      }
+      const data = await res.json()
+      setAnnouncements([data.announcement, ...announcements])
+      setIsDialogOpen(false)
+      setNewAnnouncement({ title: "", content: "", priority: "Medium", targetAudience: "All", courseId: "none" })
+      toast.success("Announcement published!")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Something went wrong")
+    } finally {
+      setIsSubmitting(false)
     }
-    initialAnnouncements.unshift(announcement)
-    setAnnouncements([...initialAnnouncements])
-    setIsDialogOpen(false)
-    setNewAnnouncement({ title: "", content: "", priority: "Medium", targetAudience: "All", courseId: "" })
-    toast.success("Announcement published!")
   }
 
   const handleDeleteAnnouncement = (id: number) => {
-    const idx = initialAnnouncements.findIndex((a) => a.id === id)
-    if (idx !== -1) initialAnnouncements.splice(idx, 1)
-    setAnnouncements([...initialAnnouncements])
+    setAnnouncements(announcements.filter((a) => a.id !== id))
   }
 
   const getPriorityColor = (priority: string) => {
@@ -98,7 +115,7 @@ export default function Announcements() {
             <SelectContent>
               <SelectItem value="all">All Announcements</SelectItem>
               <SelectItem value="general">General</SelectItem>
-              {mockCourses.map((c) => (
+              {courses.map((c) => (
                 <SelectItem key={c.id} value={c.id.toString()}>{c.title}</SelectItem>
               ))}
             </SelectContent>
@@ -129,8 +146,8 @@ export default function Announcements() {
                     <Select value={newAnnouncement.courseId} onValueChange={(v) => setNewAnnouncement({ ...newAnnouncement, courseId: v })}>
                       <SelectTrigger id="ann-course"><SelectValue placeholder="All courses" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">General</SelectItem>
-                        {mockCourses.map((c) => (
+                        <SelectItem value="none">General</SelectItem>
+                        {courses.map((c) => (
                           <SelectItem key={c.id} value={c.id.toString()}>{c.title}</SelectItem>
                         ))}
                       </SelectContent>
@@ -166,8 +183,8 @@ export default function Announcements() {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                  <Button onClick={handleCreateAnnouncement}>Publish</Button>
+                  <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>Cancel</Button>
+                  <Button onClick={handleCreateAnnouncement} disabled={isSubmitting}>{isSubmitting ? "Publishing..." : "Publish"}</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -176,8 +193,14 @@ export default function Announcements() {
       </div>
 
       <div className="space-y-4 animate-slide-up" style={{ animationDelay: "100ms" }}>
-        {filtered.map((announcement) => {
-          const course = announcement.courseId ? mockCourses.find((c) => c.id === announcement.courseId) : null
+        {filtered.length === 0 ? (
+          <EmptyState
+            icon={<VolumeX className="w-12 h-12 text-muted-foreground" />}
+            title="No announcements"
+            description={courseFilter !== "all" ? "No announcements match the selected course." : "No announcements yet."}
+          />
+        ) : filtered.map((announcement) => {
+          const course = announcement.courseId ? courses.find((c) => c.id === announcement.courseId) : null
           return (
             <Card key={announcement.id} className="border-0 shadow-card card-hover">
               <CardHeader className="pb-3">

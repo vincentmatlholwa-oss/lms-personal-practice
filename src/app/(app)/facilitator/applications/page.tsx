@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useAuth } from "../../../../lib/auth-context"
-import { mockFacilitatorApplications, mockNotifications } from "../../../../lib/mock-data"
+import { useData } from "../../../../lib/data-context"
 import { Card, CardContent, CardHeader, CardTitle } from "../../../../components/ui/card"
 import { Button } from "../../../../components/ui/button"
 import { Badge } from "../../../../components/ui/badge"
@@ -12,37 +12,37 @@ import { toast } from "sonner"
 
 export default function FacilitatorApplicationsPage() {
   const { user, users, setUsers } = useAuth()
+  const { facilitatorApplications: applications, setFacilitatorApplications: setApplications, notifications, setNotifications } = useData()
   const router = useRouter()
-  const [applications, setApplications] = useState(mockFacilitatorApplications)
 
   if (!user || user.role !== "Admin") return <div className="p-6"><h1>Access denied</h1></div>
 
   const handleApprove = (appId: number, userId: number) => {
     setApplications(applications.map((a) => a.id === appId ? { ...a, status: "Approved" as const } : a))
     setUsers(users.map((u) => u.id === userId ? { ...u, status: "Active" as const } : u))
-    mockNotifications.push({
-      id: mockNotifications.length + 1,
+    setNotifications([...notifications, {
+      id: notifications.length + 1,
       userId,
       title: "Application Approved",
       message: "Your facilitator application has been approved. You can now sign in and start managing courses.",
       date: new Date().toISOString(),
       read: false,
       link: "/dashboard",
-    })
+    }])
     toast.success("Facilitator application approved")
   }
 
   const handleDecline = (appId: number, userId: number) => {
     setApplications(applications.map((a) => a.id === appId ? { ...a, status: "Declined" as const } : a))
     setUsers(users.map((u) => u.id === userId ? { ...u, status: "Suspended" as const } : u))
-    mockNotifications.push({
-      id: mockNotifications.length + 1,
+    setNotifications([...notifications, {
+      id: notifications.length + 1,
       userId,
       title: "Application Declined",
       message: "Your facilitator application has been declined. Please contact an administrator for more information.",
       date: new Date().toISOString(),
       read: false,
-    })
+    }])
     toast.success("Facilitator application declined")
   }
 
@@ -84,7 +84,7 @@ export default function FacilitatorApplicationsPage() {
                       </div>
                       <Badge variant="secondary" className="bg-warning text-warning-foreground hover:bg-warning/90 border-0">{app.status}</Badge>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                       <div>
                         <span className="text-muted-foreground">Subject:</span>
                         <p className="font-medium">{app.subject}</p>

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "../../../lib/auth-context"
-import { mockNotifications } from "../../../lib/mock-data"
+import { useData } from "../../../lib/data-context"
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card"
 import { Button } from "../../../components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui/tabs"
@@ -12,8 +12,8 @@ import { toast } from "sonner"
 
 export default function NotificationsPage() {
   const { user } = useAuth()
+  const { notifications, setNotifications } = useData()
   const router = useRouter()
-  const [notifications, setNotifications] = useState(mockNotifications)
   const [activeTab, setActiveTab] = useState("all")
 
   if (!user) return null
@@ -34,9 +34,7 @@ export default function NotificationsPage() {
   }
 
   const deleteNotification = (id: number) => {
-    const idx = notifications.findIndex((n) => n.id === id)
-    if (idx !== -1) notifications.splice(idx, 1)
-    setNotifications([...notifications])
+    setNotifications(notifications.filter((n) => n.id !== id))
   }
 
   return (

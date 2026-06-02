@@ -1,7 +1,7 @@
 "use client"
 
 import { useAuth } from "../../../lib/auth-context"
-import { mockCourses, mockEnrollments, mockModules, mockGradebook, mockCourseProgress } from "../../../lib/mock-data"
+import { useData } from "../../../lib/data-context"
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card"
 import { Button } from "../../../components/ui/button"
 import { useRouter } from "next/navigation"
@@ -10,12 +10,13 @@ import { BookOpen, CalendarDays, GraduationCap, Sparkles, ArrowLeft } from "luci
 export default function MyCourses() {
   const { user } = useAuth()
   const router = useRouter()
+  const { courses, modules, enrollments, gradebook, courseProgress } = useData()
 
   if (!user) return null
 
-  const myEnrollments = mockEnrollments.filter((e) => e.userId === user.id)
-  const myCourses = mockCourses.filter((c) => myEnrollments.some((e) => e.courseId === c.id))
-  const availableCourses = mockCourses.filter((c) => !myEnrollments.some((e) => e.courseId === c.id) && c.status === "Active")
+  const myEnrollments = enrollments.filter((e) => e.userId === user.id)
+  const myCourses = courses.filter((c) => myEnrollments.some((e) => e.courseId === c.id))
+  const availableCourses = courses.filter((c) => !myEnrollments.some((e) => e.courseId === c.id) && c.status === "Active")
 
   return (
     <div className="p-6 lg:p-8 space-y-8 animate-fade-in">
@@ -45,10 +46,10 @@ export default function MyCourses() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 animate-slide-up">
           {myCourses.map((course, i) => {
-            const courseModules = mockModules.filter((m) => m.courseId === course.id)
-            const grades = mockGradebook.filter((g) => g.userId === user.id && g.courseId === course.id)
+            const courseModules = modules.filter((m) => m.courseId === course.id)
+            const grades = gradebook.filter((g) => g.userId === user.id && g.courseId === course.id)
             const avgGrade = grades.length > 0 ? Math.round(grades.reduce((s, g) => s + (g.score / g.total) * 100, 0) / grades.length) : null
-            const progress = mockCourseProgress.find((p) => p.userId === user.id && p.courseId === course.id)
+            const progress = courseProgress.find((p) => p.userId === user.id && p.courseId === course.id)
             const completedCount = progress?.completedModuleIds.length || 0
             const totalCount = courseModules.length || 1
             const pct = Math.round((completedCount / totalCount) * 100)

@@ -5,20 +5,21 @@ import { useRouter } from "next/navigation"
 import { Calendar } from "../../../components/ui/calendar"
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card"
 import { Badge } from "../../../components/ui/badge"
-import { mockCalendarEvents, mockCourses } from "../../../lib/mock-data"
+import { useData } from "../../../lib/data-context"
 import { useAuth } from "../../../lib/auth-context"
 import { CalendarDays, CalendarIcon, ArrowLeft } from "lucide-react"
 
 export default function CalendarPage() {
   const { user } = useAuth()
   const router = useRouter()
+  const { calendarEvents, courses } = useData()
   const [date, setDate] = useState<Date | undefined>(new Date())
 
   if (!user) return null
 
   const selectedDateStr = date ? date.toISOString().split("T")[0] : ""
-  const selectedEvents = mockCalendarEvents.filter((e) => e.date === selectedDateStr)
-  const allEvents = [...mockCalendarEvents].sort((a, b) => a.date.localeCompare(b.date))
+  const selectedEvents = calendarEvents.filter((e) => e.date === selectedDateStr)
+  const allEvents = [...calendarEvents].sort((a, b) => a.date.localeCompare(b.date))
 
   const getBadgeClass = (type: string) => {
     switch (type) {
@@ -64,7 +65,7 @@ export default function CalendarPage() {
               <p className="text-sm text-muted-foreground text-center py-8">No events on this date</p>
             ) : (
               selectedEvents.map((e) => {
-                const course = mockCourses.find((c) => c.id === e.courseId)
+                const course = courses.find((c) => c.id === e.courseId)
                 return (
                   <div key={e.id} className="flex items-center justify-between p-3 border rounded-lg card-hover">
                     <div>
@@ -91,7 +92,7 @@ export default function CalendarPage() {
         <CardContent>
           <div className="divide-y">
             {allEvents.map((e) => {
-              const course = mockCourses.find((c) => c.id === e.courseId)
+              const course = courses.find((c) => c.id === e.courseId)
               return (
                 <div key={e.id} className="flex items-center justify-between py-3">
                   <div className="flex items-center gap-3">

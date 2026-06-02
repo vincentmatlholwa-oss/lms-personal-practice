@@ -3,11 +3,7 @@
 import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "../../../../lib/auth-context"
-import {
-  mockCourses, mockModules, mockLessons, mockQuizzes, mockAssignments,
-  mockEnrollments, mockGradebook, mockDiscussions, mockDiscussionReplies,
-  mockCourseReviews,
-} from "../../../../lib/mock-data"
+import { useData } from "../../../../lib/data-context"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../../../components/ui/card"
 import { Badge } from "../../../../components/ui/badge"
 import { Button } from "../../../../components/ui/button"
@@ -24,7 +20,7 @@ import {
 import { toast } from "sonner"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function NewDiscussionForm({ courseId, user }: { courseId: number; user: any }) {
+function NewDiscussionForm({ courseId, user, discussions, setDiscussions }: { courseId: number; user: any; discussions: any[]; setDiscussions: (d: any[]) => void }) {
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
   const [open, setOpen] = useState(true)
@@ -35,8 +31,8 @@ function NewDiscussionForm({ courseId, user }: { courseId: number; user: any }) 
       toast.error("Please fill in all fields")
       return
     }
-    mockDiscussions.push({
-      id: mockDiscussions.length + 1,
+    const newDisc = {
+      id: discussions.length + 1,
       courseId,
       userId: user.id,
       title,
@@ -44,7 +40,8 @@ function NewDiscussionForm({ courseId, user }: { courseId: number; user: any }) 
       createdAt: new Date().toISOString(),
       pinned: false,
       resolved: false,
-    })
+    }
+    setDiscussions([...discussions, newDisc])
     setTitle("")
     setContent("")
     setOpen(false)
@@ -70,7 +67,7 @@ function NewDiscussionForm({ courseId, user }: { courseId: number; user: any }) 
   )
 }
 
-function NewReviewForm({ courseId, userId }: { courseId: number; userId: number }) {
+function NewReviewForm({ courseId, userId, courseReviews, setCourseReviews }: { courseId: number; userId: number; courseReviews: any[]; setCourseReviews: (r: any[]) => void }) {
   const [rating, setRating] = useState(5)
   const [comment, setComment] = useState("")
   const [open, setOpen] = useState(true)
@@ -81,14 +78,15 @@ function NewReviewForm({ courseId, userId }: { courseId: number; userId: number 
       toast.error("Please write a comment")
       return
     }
-    mockCourseReviews.push({
-      id: mockCourseReviews.length + 1,
+    const newReview = {
+      id: courseReviews.length + 1,
       userId,
       courseId,
       rating,
       comment,
       createdAt: new Date().toISOString(),
-    })
+    }
+    setCourseReviews([...courseReviews, newReview])
     setOpen(false)
     toast.success("Review submitted!")
   }
@@ -123,8 +121,9 @@ export default function CourseDetail() {
   const params = useParams()
   const router = useRouter()
   const { user, users } = useAuth()
+  const { courses, setCourses, enrollments, setEnrollments, modules, setModules, quizzes, setQuizzes, assignments, setAssignments, lessons, gradebook, discussions, setDiscussions, discussionReplies, courseReviews, setCourseReviews, loading } = useData()
   const courseId = Number(params.courseId)
-  const course = mockCourses.find((c) => c.id === courseId)
+  const course = courses.find((c) => c.id === courseId)
 
   const [moduleDialogOpen, setModuleDialogOpen] = useState(false)
   const [newModule, setNewModule] = useState({ title: "", description: "" })
@@ -136,16 +135,16 @@ export default function CourseDetail() {
   if (!user) return null
   if (!course) return <div className="p-6"><h1>Course not found</h1></div>
 
-  const modules = mockModules.filter((m) => m.courseId === courseId).sort((a, b) => a.order - b.order)
+  const courseModules = modules.filter((m) => m.courseId === courseId).sort((a, b) => a.order - b.order)
   const facilitator = users.find((u) => u.id === course.facilitatorId)
-  const enrolledStudents = mockEnrollments.filter((e) => e.courseId === courseId).map((e) => users.find((u) => u.id === e.userId)).filter(Boolean)
-  const isEnrolled = mockEnrollments.some((e) => e.userId === user.id && e.courseId === courseId)
+  const enrolledStudents = enrollments.filter((e) => e.courseId === courseId).map((e) => users.find((u) => u.id === e.userId)).filter(Boolean)
+  const isEnrolled = enrollments.some((e) => e.userId === user.id && e.courseId === courseId)
   const isAdmin = user.role === "Admin"
   const isFacilitator = user.role === "Facilitator" && course.facilitatorId === user.id
   const canEdit = isAdmin || isFacilitator
 
   const handleEnroll = () => {
-    mockEnrollments.push({ userId: user.id, courseId })
+    setEnrollments([...enrollments, { userId: user.id, courseId }])
     router.refresh()
   }
 
@@ -154,17 +153,17 @@ export default function CourseDetail() {
       toast.error("Module title is required")
       return
     }
-    mockModules.push({
-      id: mockModules.length + 1,
+    const newMod = {
+      id: modules.length + 1,
       courseId,
       title: newModule.title,
       description: newModule.description,
       order: modules.length + 1,
-    })
+    }
+    setModules([...modules, newMod])
     setModuleDialogOpen(false)
     setNewModule({ title: "", description: "" })
     toast.success("Module added successfully")
-    router.refresh()
   }
 
   const handleCreateAssessment = () => {
@@ -173,31 +172,32 @@ export default function CourseDetail() {
       return
     }
     if (newAssessment.type === "Quiz") {
-      mockQuizzes.push({
-        id: mockQuizzes.length + 1,
-        activityId: mockQuizzes.length + 1,
-        moduleId: modules[0]?.id || 1,
+      const newQuiz = {
+        id: quizzes.length + 1,
+        activityId: quizzes.length + 1,
+        moduleId: courseModules[0]?.id || 1,
         title: newAssessment.title,
         description: newAssessment.description,
         dueDate: newAssessment.dueDate || "2026-12-31",
         timeLimit: 30,
         questions: [],
-      })
+      }
+      setQuizzes([...quizzes, newQuiz])
     } else {
-      mockAssignments.push({
-        id: mockAssignments.length + 1,
-        moduleId: modules[0]?.id || 1,
+      const newAssignment = {
+        id: assignments.length + 1,
+        moduleId: courseModules[0]?.id || 1,
         courseId,
         title: newAssessment.title,
         description: newAssessment.description,
         dueDate: newAssessment.dueDate || "2026-12-31",
         attachments: [],
-      })
+      }
+      setAssignments([...assignments, newAssignment])
     }
     setAssessmentDialogOpen(false)
     setNewAssessment({ type: "Quiz", title: "", description: "", dueDate: "" })
     toast.success(`${newAssessment.type} created successfully`)
-    router.refresh()
   }
 
   const availableFacilitators = users.filter((u) => u.role === "Facilitator" && u.status === "Active")
@@ -208,9 +208,11 @@ export default function CourseDetail() {
       return
     }
     const facId = Number(selectedFacilitatorId)
-    const courseIdx = mockCourses.findIndex((c) => c.id === courseId)
+    const courseIdx = courses.findIndex((c) => c.id === courseId)
     if (courseIdx !== -1) {
-      mockCourses[courseIdx] = { ...mockCourses[courseIdx], facilitatorId: facId }
+      const updated = [...courses]
+      updated[courseIdx] = { ...updated[courseIdx], facilitatorId: facId }
+      setCourses(updated)
     }
     setFacilitatorDialogOpen(false)
     toast.success("Facilitator assigned successfully")
@@ -262,23 +264,28 @@ export default function CourseDetail() {
         </TabsList>
 
         <TabsContent value="modules" className="mt-6 space-y-4">
-          {modules.length === 0 ? (
-            <Card className="border-0 shadow-card">
-              <CardContent className="text-center py-12 text-muted-foreground">No modules have been created yet.</CardContent>
-            </Card>
-          ) : (
-            modules.map((mod, idx) => {
-              const lessons = mockLessons.filter((l) => l.moduleId === mod.id)
-              const quizzes = mockQuizzes.filter((q) => q.moduleId === mod.id)
-              const assignments = mockAssignments.filter((a) => a.moduleId === mod.id && a.courseId === courseId)
+            {courseModules.length === 0 ? (
+              <Card className="border-0 shadow-card">
+                <CardContent className="text-center py-12 text-muted-foreground">No modules have been created yet.</CardContent>
+              </Card>
+            ) : (
+              courseModules.map((mod, idx) => {
+                const moduleLessons = lessons.filter((l) => l.moduleId === mod.id)
+                const moduleQuizzes = quizzes.filter((q) => q.moduleId === mod.id)
+                const moduleAssignments = assignments.filter((a) => a.moduleId === mod.id && a.courseId === courseId)
+
 
               const moveModule = (dir: "up" | "down") => {
                 const targetIdx = dir === "up" ? idx - 1 : idx + 1
-                if (targetIdx < 0 || targetIdx >= modules.length) return
-                const temp = modules[idx].order
-                modules[idx].order = modules[targetIdx].order
-                modules[targetIdx].order = temp
-                modules.sort((a, b) => a.order - b.order)
+                if (targetIdx < 0 || targetIdx >= courseModules.length) return
+                const updated = [...modules]
+                const aIdx = updated.findIndex((m) => m.id === courseModules[idx].id)
+                const bIdx = updated.findIndex((m) => m.id === courseModules[targetIdx].id)
+                if (aIdx === -1 || bIdx === -1) return
+                const temp = updated[aIdx].order
+                updated[aIdx] = { ...updated[aIdx], order: updated[bIdx].order }
+                updated[bIdx] = { ...updated[bIdx], order: temp }
+                setModules(updated)
                 toast.success(`Module moved ${dir}`)
               }
 
@@ -292,7 +299,7 @@ export default function CourseDetail() {
                             <button onClick={() => moveModule("up")} disabled={idx === 0} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed">
                               <ArrowUp className="w-3 h-3" />
                             </button>
-                            <button onClick={() => moveModule("down")} disabled={idx === modules.length - 1} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed">
+                            <button onClick={() => moveModule("down")} disabled={idx === courseModules.length - 1} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed">
                               <ArrowDown className="w-3 h-3" />
                             </button>
                           </div>
@@ -304,11 +311,11 @@ export default function CourseDetail() {
                           <CardDescription>{mod.description}</CardDescription>
                         </div>
                       </div>
-                      <Badge variant="outline" className="shrink-0">{lessons.length} lessons</Badge>
+                      <Badge variant="outline" className="shrink-0">{moduleLessons.length} lessons</Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    {lessons.map((lesson) => (
+                    {moduleLessons.map((lesson) => (
                       <div key={lesson.id} className="p-3 border rounded-lg hover:bg-accent/50 cursor-pointer" onClick={() => router.push(`/courses/${courseId}/modules/${mod.id}`)}>
                         <div className="flex items-start justify-between">
                           <div className="flex items-start gap-3">
@@ -326,10 +333,10 @@ export default function CourseDetail() {
                       </div>
                     ))}
 
-                    {quizzes.length > 0 && (
+                    {moduleQuizzes.length > 0 && (
                       <div className="space-y-2 pt-2 border-t">
                         <p className="text-xs font-medium text-muted-foreground uppercase">Assessments</p>
-                        {quizzes.map((quiz) => (
+                        {moduleQuizzes.map((quiz) => (
                           <div key={quiz.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
                             <div className="flex items-center gap-2">
                               <ClipboardList className="w-4 h-4 text-gold" />
@@ -350,9 +357,9 @@ export default function CourseDetail() {
                       </div>
                     )}
 
-                    {assignments.length > 0 && (
+                    {moduleAssignments.length > 0 && (
                       <div className="space-y-2">
-                        {assignments.map((assignment) => (
+                        {moduleAssignments.map((assignment) => (
                           <div key={assignment.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
                             <div className="flex items-center gap-2">
                               <FileText className="w-4 h-4 text-gold" />
@@ -388,7 +395,7 @@ export default function CourseDetail() {
               </CardHeader>
               <CardContent>
                 {(() => {
-                  const grades = mockGradebook.filter((g) => g.userId === user.id && g.courseId === courseId)
+                  const grades = gradebook.filter((g) => g.userId === user.id && g.courseId === courseId)
                   if (grades.length === 0) return <p className="text-sm text-muted-foreground text-center py-8">No grades available yet.</p>
                   const avg = Math.round(grades.reduce((s, g) => s + (g.score / g.total) * 100, 0) / grades.length)
                   return (
@@ -597,11 +604,11 @@ export default function CourseDetail() {
                     <DialogTitle>Start a Discussion</DialogTitle>
                     <DialogDescription>Post a question or topic for discussion.</DialogDescription>
                   </DialogHeader>
-                  <NewDiscussionForm courseId={courseId} user={user} />
+                  <NewDiscussionForm courseId={courseId} user={user} discussions={discussions} setDiscussions={setDiscussions} />
                 </DialogContent>
               </Dialog>
             </div>
-            {mockDiscussions.filter((d) => d.courseId === courseId).length === 0 ? (
+            {discussions.filter((d) => d.courseId === courseId).length === 0 ? (
               <Card className="border-0 shadow-card">
                 <CardContent className="text-center py-12 text-muted-foreground">
                   <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -609,9 +616,9 @@ export default function CourseDetail() {
                 </CardContent>
               </Card>
             ) : (
-              mockDiscussions.filter((d) => d.courseId === courseId).map((disc) => {
+              discussions.filter((d) => d.courseId === courseId).map((disc) => {
                 const author = users.find((u) => u.id === disc.userId)
-                const replies = mockDiscussionReplies.filter((r) => r.discussionId === disc.id)
+                const replies = discussionReplies.filter((r) => r.discussionId === disc.id)
                 return (
                   <Card key={disc.id} className="border-0 shadow-card card-hover">
                     <CardHeader className="pb-3">
@@ -658,13 +665,13 @@ export default function CourseDetail() {
                       <DialogTitle>Write a Review</DialogTitle>
                       <DialogDescription>Share your experience with this course.</DialogDescription>
                     </DialogHeader>
-                    <NewReviewForm courseId={courseId} userId={user.id} />
+                    <NewReviewForm courseId={courseId} userId={user.id} courseReviews={courseReviews} setCourseReviews={setCourseReviews} />
                   </DialogContent>
                 </Dialog>
               )}
             </div>
             {(() => {
-              const reviews = mockCourseReviews.filter((r) => r.courseId === courseId)
+              const reviews = courseReviews.filter((r) => r.courseId === courseId)
               const avgRating = reviews.length > 0 ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) : 0
               return (
                 <>

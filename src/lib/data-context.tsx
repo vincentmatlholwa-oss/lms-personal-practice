@@ -1,10 +1,13 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react"
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
+import type {
+  Course, Module, Quiz, Assignment, Announcement, FacilitatorApplication,
+  GradebookEntry, Notification, CalendarEvent,
+  Submission, Discussion, DiscussionReply, CourseReview, Certificate, CourseProgress,
+  Lesson, Activity,
+} from "./mock-data"
 import {
-  type Course, type Module, type Quiz, type Assignment, type Announcement, type FacilitatorApplication,
-  type GradebookEntry, type Notification, type CalendarEvent,
-  type Submission, type Discussion, type DiscussionReply, type CourseReview, type Certificate, type CourseProgress,
   mockCourses as defaultCourses, mockModules as defaultModules,
   mockQuizzes as defaultQuizzes, mockAssignments as defaultAssignments,
   mockAnnouncements as defaultAnnouncements, mockGradebook as defaultGradebook,
@@ -14,26 +17,10 @@ import {
   mockDiscussions as defaultDiscussions, mockDiscussionReplies as defaultDiscussionReplies,
   mockCourseReviews as defaultCourseReviews, mockCertificates as defaultCertificates,
   mockCourseProgress as defaultCourseProgress,
+  mockEnrollments as defaultEnrollments,
+  mockLessons as defaultLessons,
+  mockActivities as defaultActivities,
 } from "./mock-data"
-
-const STORAGE_PREFIX = "lms_data_"
-
-function loadFromStorage<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback
-  try {
-    const raw = localStorage.getItem(STORAGE_PREFIX + key)
-    return raw ? JSON.parse(raw) : fallback
-  } catch {
-    return fallback
-  }
-}
-
-function saveToStorage<T>(key: string, data: T) {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(data))
-  } catch {}
-}
 
 interface DataContextType {
   courses: Course[]
@@ -68,44 +55,122 @@ interface DataContextType {
   setCertificates: (certs: Certificate[]) => void
   courseProgress: CourseProgress[]
   setCourseProgress: (progress: CourseProgress[]) => void
+  lessons: Lesson[]
+  setLessons: (lessons: Lesson[]) => void
+  activities: Activity[]
+  setActivities: (activities: Activity[]) => void
+  loading: boolean
 }
 
 const DataContext = createContext<DataContextType | null>(null)
 
-export function DataProvider({ children }: { children: ReactNode }) {
-  const [courses, setCoursesState] = useState<Course[]>(() => loadFromStorage("courses", defaultCourses))
-  const [modules, setModulesState] = useState<Module[]>(() => loadFromStorage("modules", defaultModules))
-  const [quizzes, setQuizzesState] = useState<Quiz[]>(() => loadFromStorage("quizzes", defaultQuizzes))
-  const [assignments, setAssignmentsState] = useState<Assignment[]>(() => loadFromStorage("assignments", defaultAssignments))
-  const [enrollments, setEnrollmentsState] = useState<{ userId: number; courseId: number }[]>(() => loadFromStorage("enrollments", []))
-  const [announcements, setAnnouncementsState] = useState<Announcement[]>(() => loadFromStorage("announcements", defaultAnnouncements))
-  const [gradebook, setGradebookState] = useState<GradebookEntry[]>(() => loadFromStorage("gradebook", defaultGradebook))
-  const [notifications, setNotificationsState] = useState<Notification[]>(() => loadFromStorage("notifications", defaultNotifications))
-  const [calendarEvents, setCalendarEventsState] = useState<CalendarEvent[]>(() => loadFromStorage("calendarEvents", defaultCalendarEvents))
-  const [facilitatorApplications, setFacilitatorApplicationsState] = useState<FacilitatorApplication[]>(() => loadFromStorage("facilitatorApplications", defaultApplications))
-  const [submissions, setSubmissionsState] = useState<Submission[]>(() => loadFromStorage("submissions", defaultSubmissions))
-  const [discussions, setDiscussionsState] = useState<Discussion[]>(() => loadFromStorage("discussions", defaultDiscussions))
-  const [discussionReplies, setDiscussionRepliesState] = useState<DiscussionReply[]>(() => loadFromStorage("discussionReplies", defaultDiscussionReplies))
-  const [courseReviews, setCourseReviewsState] = useState<CourseReview[]>(() => loadFromStorage("courseReviews", defaultCourseReviews))
-  const [certificates, setCertificatesState] = useState<Certificate[]>(() => loadFromStorage("certificates", defaultCertificates))
-  const [courseProgress, setCourseProgressState] = useState<CourseProgress[]>(() => loadFromStorage("courseProgress", defaultCourseProgress))
+function getToken(): string | null {
+  if (typeof window === "undefined") return null
+  return sessionStorage.getItem("lms_token")
+}
 
-  const setCourses = useCallback((data: Course[]) => { setCoursesState(data); saveToStorage("courses", data) }, [])
-  const setModules = useCallback((data: Module[]) => { setModulesState(data); saveToStorage("modules", data) }, [])
-  const setQuizzes = useCallback((data: Quiz[]) => { setQuizzesState(data); saveToStorage("quizzes", data) }, [])
-  const setAssignments = useCallback((data: Assignment[]) => { setAssignmentsState(data); saveToStorage("assignments", data) }, [])
-  const setEnrollments = useCallback((data: { userId: number; courseId: number }[]) => { setEnrollmentsState(data); saveToStorage("enrollments", data) }, [])
-  const setAnnouncements = useCallback((data: Announcement[]) => { setAnnouncementsState(data); saveToStorage("announcements", data) }, [])
-  const setGradebook = useCallback((data: GradebookEntry[]) => { setGradebookState(data); saveToStorage("gradebook", data) }, [])
-  const setNotifications = useCallback((data: Notification[]) => { setNotificationsState(data); saveToStorage("notifications", data) }, [])
-  const setCalendarEvents = useCallback((data: CalendarEvent[]) => { setCalendarEventsState(data); saveToStorage("calendarEvents", data) }, [])
-  const setFacilitatorApplications = useCallback((data: FacilitatorApplication[]) => { setFacilitatorApplicationsState(data); saveToStorage("facilitatorApplications", data) }, [])
-  const setSubmissions = useCallback((data: Submission[]) => { setSubmissionsState(data); saveToStorage("submissions", data) }, [])
-  const setDiscussions = useCallback((data: Discussion[]) => { setDiscussionsState(data); saveToStorage("discussions", data) }, [])
-  const setDiscussionReplies = useCallback((data: DiscussionReply[]) => { setDiscussionRepliesState(data); saveToStorage("discussionReplies", data) }, [])
-  const setCourseReviews = useCallback((data: CourseReview[]) => { setCourseReviewsState(data); saveToStorage("courseReviews", data) }, [])
-  const setCertificates = useCallback((data: Certificate[]) => { setCertificatesState(data); saveToStorage("certificates", data) }, [])
-  const setCourseProgress = useCallback((data: CourseProgress[]) => { setCourseProgressState(data); saveToStorage("courseProgress", data) }, [])
+function getUserId(): number | null {
+  if (typeof window === "undefined") return null
+  try {
+    const stored = sessionStorage.getItem("lms_user")
+    if (!stored) return null
+    return JSON.parse(stored).id as number
+  } catch {
+    return null
+  }
+}
+
+async function apiGet<T>(url: string): Promise<T | null> {
+  const token = getToken()
+  if (!token) return null
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
+  }
+}
+
+export function DataProvider({ children }: { children: ReactNode }) {
+  const [courses, setCoursesState] = useState<Course[]>([...defaultCourses])
+  const [modules, setModulesState] = useState<Module[]>([...defaultModules])
+  const [quizzes, setQuizzesState] = useState<Quiz[]>([...defaultQuizzes])
+  const [assignments, setAssignmentsState] = useState<Assignment[]>([...defaultAssignments])
+  const [enrollments, setEnrollmentsState] = useState<{ userId: number; courseId: number }[]>([...defaultEnrollments])
+  const [announcements, setAnnouncementsState] = useState<Announcement[]>([...defaultAnnouncements])
+  const [gradebook, setGradebookState] = useState<GradebookEntry[]>([...defaultGradebook])
+  const [notifications, setNotificationsState] = useState<Notification[]>([...defaultNotifications])
+  const [calendarEvents, setCalendarEventsState] = useState<CalendarEvent[]>([...defaultCalendarEvents])
+  const [facilitatorApplications, setFacilitatorApplicationsState] = useState<FacilitatorApplication[]>([...defaultApplications])
+  const [submissions, setSubmissionsState] = useState<Submission[]>([...defaultSubmissions])
+  const [discussions, setDiscussionsState] = useState<Discussion[]>([...defaultDiscussions])
+  const [discussionReplies, setDiscussionRepliesState] = useState<DiscussionReply[]>([...defaultDiscussionReplies])
+  const [courseReviews, setCourseReviewsState] = useState<CourseReview[]>([...defaultCourseReviews])
+  const [certificates, setCertificatesState] = useState<Certificate[]>([...defaultCertificates])
+  const [courseProgress, setCourseProgressState] = useState<CourseProgress[]>([...defaultCourseProgress])
+  const [lessons, setLessonsState] = useState<Lesson[]>([...defaultLessons])
+  const [activities, setActivitiesState] = useState<Activity[]>([...defaultActivities])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadAll() {
+      const uid = getUserId()
+      const [coursesRes, announcementsRes, enrollmentsRes, gradebookRes, notificationsRes, eventsRes, appsRes, submissionsRes, discussionsRes, reviewsRes, certsRes, progressRes, lessonsRes, activitiesRes] = await Promise.all([
+        apiGet<{ courses: Course[] }>("/api/courses"),
+        apiGet<{ announcements: Announcement[] }>("/api/announcements"),
+        apiGet<{ enrollments: { userId: number; courseId: number }[] }>("/api/enrollments"),
+        apiGet<{ gradebook: GradebookEntry[] }>("/api/gradebook"),
+        apiGet<{ notifications: Notification[] }>(uid ? `/api/notifications?userId=${uid}` : "/api/notifications"),
+        apiGet<{ events: CalendarEvent[] }>("/api/calendar-events"),
+        apiGet<{ applications: FacilitatorApplication[] }>("/api/facilitator-applications"),
+        apiGet<{ submissions: Submission[] }>("/api/submissions"),
+        apiGet<{ discussions: Discussion[] }>("/api/discussions"),
+        apiGet<{ reviews: CourseReview[] }>("/api/course-reviews"),
+        apiGet<{ certificates: Certificate[] }>("/api/certificates"),
+        apiGet<{ progress: CourseProgress[] }>("/api/course-progress"),
+        apiGet<{ lessons: Lesson[] }>("/api/lessons"),
+        apiGet<{ activities: Activity[] }>("/api/activities"),
+      ])
+      if (coursesRes?.courses) setCoursesState(coursesRes.courses)
+      if (announcementsRes?.announcements) setAnnouncementsState(announcementsRes.announcements)
+      if (enrollmentsRes?.enrollments) setEnrollmentsState(enrollmentsRes.enrollments)
+      if (gradebookRes?.gradebook) setGradebookState(gradebookRes.gradebook)
+      if (notificationsRes?.notifications) setNotificationsState(notificationsRes.notifications)
+      if (eventsRes?.events) setCalendarEventsState(eventsRes.events)
+      if (appsRes?.applications) setFacilitatorApplicationsState(appsRes.applications)
+      if (submissionsRes?.submissions) setSubmissionsState(submissionsRes.submissions)
+      if (discussionsRes?.discussions) setDiscussionsState(discussionsRes.discussions)
+      if (reviewsRes?.reviews) setCourseReviewsState(reviewsRes.reviews)
+      if (certsRes?.certificates) setCertificatesState(certsRes.certificates)
+      if (progressRes?.progress) setCourseProgressState(progressRes.progress)
+      if (lessonsRes?.lessons) setLessonsState(lessonsRes.lessons)
+      if (activitiesRes?.activities) setActivitiesState(activitiesRes.activities)
+      setLoading(false)
+    }
+    loadAll()
+  }, [])
+
+  const setCourses = useCallback((data: Course[]) => setCoursesState(data), [])
+  const setModules = useCallback((data: Module[]) => setModulesState(data), [])
+  const setQuizzes = useCallback((data: Quiz[]) => setQuizzesState(data), [])
+  const setAssignments = useCallback((data: Assignment[]) => setAssignmentsState(data), [])
+  const setEnrollments = useCallback((data: { userId: number; courseId: number }[]) => setEnrollmentsState(data), [])
+  const setAnnouncements = useCallback((data: Announcement[]) => setAnnouncementsState(data), [])
+  const setGradebook = useCallback((data: GradebookEntry[]) => setGradebookState(data), [])
+  const setNotifications = useCallback((data: Notification[]) => setNotificationsState(data), [])
+  const setCalendarEvents = useCallback((data: CalendarEvent[]) => setCalendarEventsState(data), [])
+  const setFacilitatorApplications = useCallback((data: FacilitatorApplication[]) => setFacilitatorApplicationsState(data), [])
+  const setSubmissions = useCallback((data: Submission[]) => setSubmissionsState(data), [])
+  const setDiscussions = useCallback((data: Discussion[]) => setDiscussionsState(data), [])
+  const setDiscussionReplies = useCallback((data: DiscussionReply[]) => setDiscussionRepliesState(data), [])
+  const setCourseReviews = useCallback((data: CourseReview[]) => setCourseReviewsState(data), [])
+  const setCertificates = useCallback((data: Certificate[]) => setCertificatesState(data), [])
+  const setCourseProgress = useCallback((data: CourseProgress[]) => setCourseProgressState(data), [])
+  const setLessons = useCallback((data: Lesson[]) => setLessonsState(data), [])
+  const setActivities = useCallback((data: Activity[]) => setActivitiesState(data), [])
 
   return (
     <DataContext.Provider value={{
@@ -117,7 +182,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       submissions, setSubmissions,
       discussions, setDiscussions, discussionReplies, setDiscussionReplies,
       courseReviews, setCourseReviews, certificates, setCertificates,
-      courseProgress, setCourseProgress,
+      courseProgress, setCourseProgress, lessons, setLessons, activities, setActivities, loading,
     }}>
       {children}
     </DataContext.Provider>

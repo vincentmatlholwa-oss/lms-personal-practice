@@ -22,7 +22,8 @@ import {
 import { Badge } from "../../../components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui/tabs"
 import { useRouter } from "next/navigation"
-import { Plus, MoreVertical, Trash2, Ban, Play, UsersIcon, ArrowLeft, Upload } from "lucide-react"
+import { EmptyState } from "../../../components/empty-state"
+import { Plus, MoreVertical, Trash2, Ban, Play, UsersIcon, ArrowLeft, Upload, UserX } from "lucide-react"
 import { toast } from "sonner"
 
 export default function Users() {
@@ -54,6 +55,7 @@ export default function Users() {
     const lines = csvText.trim().split("\n")
     let success = 0
     const errors: string[] = []
+    const newUsers: typeof users = []
     for (let i = 0; i < lines.length; i++) {
       const parts = lines[i].split(",").map((s) => s.trim())
       if (parts.length < 3) {
@@ -70,14 +72,17 @@ export default function Users() {
         errors.push(`Line ${i + 1}: Email "${email}" already exists`)
         continue
       }
-      setUsers([...users, {
+      newUsers.push({
         id: users.length + success + 1,
         firstName, lastName, email, password: "pass123",
         phone, idNumber,
         role: role as "Student" | "Facilitator" | "Admin",
         status: status as "Active" | "Suspended",
-      }])
+      })
       success++
+    }
+    if (newUsers.length > 0) {
+      setUsers([...users, ...newUsers])
     }
     setBulkResult({ success, errors })
     if (errors.length === 0) {
@@ -213,7 +218,7 @@ export default function Users() {
               <DialogDescription>Create a new user account for the LMS system.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="fname">First Name</Label>
                   <Input id="fname" value={newUser.firstName} onChange={(e) => setNewUser({ ...newUser, firstName: e.target.value })} placeholder="First name" />
@@ -333,6 +338,15 @@ export default function Users() {
                   ))}
                 </TableBody>
               </Table>
+              {filteredUsers.length === 0 && (
+                <div className="p-8">
+                  <EmptyState
+                    icon={<UserX className="w-12 h-12 text-muted-foreground" />}
+                    title="No users found"
+                    description={activeTab === "all" ? "No users in the system yet." : `No ${activeTab.replace("s$", "")} found.`}
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

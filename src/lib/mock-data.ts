@@ -213,9 +213,12 @@ export interface FacilitatorApplication {
   status: "Pending" | "Approved" | "Declined"
 }
 
-function persistArray<T>(key: string, data: T[]) {
-  if (typeof window === "undefined") return
-  try { localStorage.setItem("lms_" + key, JSON.stringify(data)) } catch {}
+export function persistArray<T>(key: string, data: T[]) {
+  try { localStorage.setItem("lms_" + key, JSON.stringify(data)) } catch { /* noop */ }
+}
+
+export function clearPersisted(key: string) {
+  try { localStorage.removeItem("lms_" + key) } catch { /* noop */ }
 }
 
 function loadArray<T>(key: string, defaults: T[]): T[] {
@@ -227,7 +230,7 @@ function loadArray<T>(key: string, defaults: T[]): T[] {
   return [...defaults]
 }
 
-function makePersistent<T>(key: string, defaults: T[]): T[] {
+export function makePersistent<T>(key: string, defaults: T[]): T[] {
   const arr = loadArray(key, defaults)
   const persist = () => persistArray(key, arr)
   const mutatingMethods = ["push", "pop", "shift", "unshift", "splice", "sort", "reverse"] as const

@@ -2,26 +2,28 @@
 
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Bell, LogOut, User, Settings, X, Search } from "lucide-react"
+import { Bell, LogOut, User, Settings, X, Search, Menu } from "lucide-react"
 import { useAuth } from "../lib/auth-context"
-import { mockNotifications, mockCourses } from "../lib/mock-data"
+import { useData } from "../lib/data-context"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "./ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "./ui/avatar"
 import { toast } from "sonner"
+import { useSidebar } from "./sidebar-provider"
 
 export function TopNav() {
   const { user, signOut } = useAuth()
+  const { notifications, courses } = useData()
   const router = useRouter()
   const [notifOpen, setNotifOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const searchRef = useRef<HTMLDivElement>(null)
-  const unreadNotifications = mockNotifications.filter((n) => n.userId === user?.id && !n.read)
+  const unreadNotifications = notifications.filter((n) => n.userId === user?.id && !n.read)
 
   const searchResults = searchQuery.trim()
-    ? mockCourses.filter((c) =>
+    ? courses.filter((c) =>
         c.title.toLowerCase().includes(searchQuery.toLowerCase())
       ).slice(0, 5)
     : []
@@ -38,9 +40,16 @@ export function TopNav() {
         setSearchOpen(false)
       }
     }
+    const handleEscape = (e: KeyboardEvent) => { if (e.key === "Escape") setSearchOpen(false) }
     document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
+    document.addEventListener("keydown", handleEscape)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+      document.removeEventListener("keydown", handleEscape)
+    }
   }, [])
+
+  const { toggle } = useSidebar()
 
   const handleSignOut = () => {
     signOut()
@@ -50,7 +59,11 @@ export function TopNav() {
 
   return (
     <header className="h-14 border-b bg-background/80 backdrop-blur-md flex items-center justify-between px-4 sm:px-6 shrink-0 sticky top-0 z-40">
-      <div className="flex-1 max-w-sm hidden sm:block" ref={searchRef}>
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <button onClick={toggle} className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-muted transition-colors">
+          <Menu className="w-5 h-5" />
+        </button>
+        <div className="flex-1 max-w-sm hidden sm:block" ref={searchRef}>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -78,6 +91,7 @@ export function TopNav() {
             </div>
           )}
         </div>
+      </div>
       </div>
       <div className="flex items-center gap-2">
         <div className="relative">
